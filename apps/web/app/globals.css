@@ -3,67 +3,224 @@
 @tailwind utilities;
 
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
+  /* Warm Tappy theme - Orange/Amber/Cream */
+  --radius: 0.625rem;
+
+  /* Cream backgrounds */
+  --background: 45 30% 98%;
+  --foreground: 25 20% 12%;
+
+  /* Warm card */
+  --card: 45 40% 99%;
+  --card-foreground: 25 20% 12%;
+
   --popover: 0 0% 100%;
-  --popover-foreground: 222.2 84% 4.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --primary: 222.2 47.4% 11.2%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222.2 47.4% 11.2%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
-  --ring: 215 20.2% 65.1%;
-  --radius: 0.5rem;
+  --popover-foreground: 25 20% 12%;
+
+  /* Burnt orange primary */
+  --primary: 24 80% 52%;
+  --primary-foreground: 45 30% 98%;
+
+  /* Warm cream secondary */
+  --secondary: 40 25% 94%;
+  --secondary-foreground: 25 20% 20%;
+
+  /* Muted warm gray */
+  --muted: 40 15% 93%;
+  --muted-foreground: 25 10% 45%;
+
+  /* Soft terracotta accent */
+  --accent: 16 65% 55%;
+  --accent-foreground: 45 30% 98%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+
+  /* Warm borders */
+  --border: 35 20% 88%;
+  --input: 35 20% 88%;
+  --ring: 24 80% 52%;
+
+  /* Sidebar */
+  --sidebar: 45 35% 97%;
+  --sidebar-foreground: 25 20% 12%;
+  --sidebar-border: 35 20% 90%;
+  --sidebar-accent: 40 25% 94%;
+  --sidebar-accent-foreground: 25 20% 20%;
+  --sidebar-primary: 24 80% 52%;
+  --sidebar-primary-foreground: 45 30% 98%;
 }
 
 .dark {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
-  --popover: 222.2 84% 4.9%;
-  --popover-foreground: 210 40% 98%;
-  --card: 222.2 84% 4.9%;
-  --card-foreground: 210 40% 98%;
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --primary: 210 40% 98%;
-  --primary-foreground: 222.2 47.4% 11.2%;
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
-  --ring: 215 20.2% 65.1%;
+  --background: 25 15% 8%;
+  --foreground: 40 20% 94%;
+
+  --card: 25 12% 11%;
+  --card-foreground: 40 20% 94%;
+
+  --popover: 25 12% 11%;
+  --popover-foreground: 40 20% 94%;
+
+  --primary: 24 85% 58%;
+  --primary-foreground: 25 15% 8%;
+
+  --secondary: 25 10% 16%;
+  --secondary-foreground: 40 20% 90%;
+
+  --muted: 25 10% 16%;
+  --muted-foreground: 35 10% 55%;
+
+  --accent: 20 70% 55%;
+  --accent-foreground: 25 15% 8%;
+
+  --destructive: 0 65% 48%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 25 12% 18%;
+  --input: 25 12% 18%;
+  --ring: 24 85% 58%;
+
+  --sidebar: 25 12% 9%;
+  --sidebar-foreground: 40 20% 94%;
+  --sidebar-border: 25 12% 15%;
+  --sidebar-accent: 25 10% 14%;
+  --sidebar-accent-foreground: 40 20% 90%;
+  --sidebar-primary: 24 85% 58%;
+  --sidebar-primary-foreground: 25 15% 8%;
 }
 
-* {
-  @apply border-border;
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  }
 }
 
-body {
-  @apply bg-background text-foreground;
+/* Editor styles - clean and minimal */
+.editor-container .ce-block__content,
+.editor-container .ce-toolbar__content {
+  max-width: 680px;
+  margin: 0 auto;
 }
 
+.editor-container .codex-editor__redactor {
+  padding-bottom: 120px !important;
+}
+
+.editor-container .ce-block {
+  @apply transition-colors duration-150;
+}
+
+.editor-container .ce-block:hover {
+  @apply rounded-lg -mx-3 px-3;
+  background-color: hsl(var(--muted) / 0.5);
+}
+
+.editor-container .ce-paragraph {
+  @apply text-base leading-relaxed;
+  line-height: 1.75;
+}
+
+.editor-container .ce-header {
+  @apply font-semibold tracking-tight;
+}
+
+.editor-container h1.ce-header {
+  @apply text-2xl mt-6 mb-3;
+}
+
+.editor-container h2.ce-header {
+  @apply text-xl mt-5 mb-2;
+}
+
+.editor-container h3.ce-header {
+  @apply text-lg mt-4 mb-2;
+}
+
+.editor-container .cdx-list {
+  @apply text-base leading-relaxed pl-5;
+}
+
+.editor-container .cdx-list__item {
+  @apply py-0.5;
+}
+
+.editor-container .ce-paragraph[data-placeholder]:empty::before {
+  @apply text-muted-foreground;
+  opacity: 0.6;
+}
+
+.editor-container .ce-toolbar__plus,
+.editor-container .ce-toolbar__settings-btn {
+  @apply bg-background border border-border rounded-lg shadow-sm;
+  @apply hover:bg-secondary transition-colors;
+}
+
+.editor-container .ce-inline-toolbar {
+  @apply bg-popover border border-border shadow-lg rounded-xl overflow-hidden;
+}
+
+.editor-container .ce-inline-tool {
+  @apply hover:bg-secondary transition-colors;
+}
+
+/* Clean scrollbar */
 .custom-scroll::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 
 .custom-scroll::-webkit-scrollbar-track {
-  background: transparent;
+  @apply bg-transparent;
 }
 
 .custom-scroll::-webkit-scrollbar-thumb {
-  background-color: hsl(var(--muted-foreground));
-  border-radius: 9999px;
+  @apply bg-border rounded-full;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/30;
+}
+
+/* Subtle animations */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-in {
+  animation: fade-in 0.25s ease-out forwards;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out forwards;
+}
+
+/* Stagger delays */
+[data-delay="1"] { animation-delay: 50ms; }
+[data-delay="2"] { animation-delay: 100ms; }
+[data-delay="3"] { animation-delay: 150ms; }
+[data-delay="4"] { animation-delay: 200ms; }
+
+/* Selection with warm color */
+::selection {
+  background-color: hsl(var(--primary) / 0.15);
+}
+
+/* Focus ring */
+.focus-ring {
+  @apply outline-none ring-2 ring-primary/20 ring-offset-2 ring-offset-background;
 }

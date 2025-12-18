@@ -1,180 +1,150 @@
 "use client";
 
-import { type FormEvent, useMemo, useState } from "react";
+import { useState } from "react";
+import { Plus, Search } from "lucide-react";
+import Link from "next/link";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { JournalEditor, readEditorContent, type EditorContent } from "@/components/editor";
-import type EditorJS from "@editorjs/editorjs";
-
-const defaultApiBase = "http://localhost:8000";
-
-const apiBase =
-  typeof process !== "undefined"
-    ? process.env.NEXT_PUBLIC_API_BASE_URL ?? defaultApiBase
-    : defaultApiBase;
-
-type PlannerAction = {
-  type: string;
-  task: string;
-  skills: string[];
+type JournalEntry = {
+  id: string;
+  date: Date;
+  preview: string;
+  actionsTriggered: number;
 };
 
-type PlannerResult = {
-  should_act: boolean;
-  action?: PlannerAction | null;
-};
+// Mock data - would come from API
+const mockEntries: JournalEntry[] = [
+  {
+    id: "1",
+    date: new Date(),
+    preview: "Had a great workout today. Feeling motivated to keep up the routine. Also need to remember to call mom this weekend...",
+    actionsTriggered: 2,
+  },
+  {
+    id: "2",
+    date: new Date(Date.now() - 86400000),
+    preview: "Work was busy but productive. The new project is coming along nicely. Thinking about taking a vacation next month...",
+    actionsTriggered: 1,
+  },
+  {
+    id: "3",
+    date: new Date(Date.now() - 86400000 * 2),
+    preview: "Finally finished reading that book I've been putting off. Really need to start eating healthier, maybe try meal prep...",
+    actionsTriggered: 3,
+  },
+  {
+    id: "4",
+    date: new Date(Date.now() - 86400000 * 5),
+    preview: "Anniversary coming up next week. Should plan something special for dinner. Also need to renew gym membership...",
+    actionsTriggered: 2,
+  },
+];
 
-type JournalResponse = {
-  plan: PlannerResult;
-  execution?: unknown;
-};
+function formatDate(date: Date) {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
 
-export default function Home() {
-  const [editorInstance, setEditorInstance] = useState<EditorJS | null>(null);
-  const [editorReady, setEditorReady] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [result, setResult] = useState<JournalResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  if (date.toDateString() === today.toDateString()) {
+    return "Today";
+  }
+  if (date.toDateString() === yesterday.toDateString()) {
+    return "Yesterday";
+  }
+  return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
 
-  const apiHint = useMemo(() => apiBase, []);
-
-  const formatEditorContent = (content: EditorContent | null) => {
-    if (!content) return "";
-
-    const plainBlocks = content.blocks.map((block) => {
-      if (block.type === "header" && typeof block.data?.text === "string") {
-        return block.data.text;
-      }
-
-      if (block.type === "list" && Array.isArray((block.data as any)?.items)) {
-        return (block.data as any).items.join("\n");
-      }
-
-      if (typeof (block.data as any)?.text === "string") {
-        return (block.data as any).text.replace(/<[^>]*>/g, "");
-      }
-
-      return JSON.stringify(block.data);
-    });
-
-    return plainBlocks.join("\n\n").trim();
-  };
-
-  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setIsSubmitting(true);
-    setResult(null);
-    setError(null);
-
-    try {
-      const content = await readEditorContent(editorInstance);
-      const text = formatEditorContent(content);
-
-      if (!text) {
-        throw new Error("Please enter a journal entry before submitting.");
-      }
-
-      const response = await fetch(`${apiBase}/journal`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ text }),
-      });
-
-      if (!response.ok) {
-        const details = await response.text();
-        throw new Error(details || `Request failed with status ${response.status}`);
-      }
-
-      const data = (await response.json()) as JournalResponse;
-      setResult(data);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Something went wrong";
-      setError(message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+export default function JournalPage() {
+  const [entries] = useState<JournalEntry[]>(mockEntries);
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">Journal automation</h1>
-        <p className="text-muted-foreground">
-          Draft a journal entry, let the planner decide if browser actions are needed, and review the
-          execution.
-        </p>
-      </div>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-30 bg-background border-b border-border">
+        <div className="flex h-14 items-center justify-between px-6">
+          <h1 className="text-base font-semibold text-foreground">Journal</h1>
+          <Link
+            href="/new"
+            className="inline-flex h-9 items-center gap-2 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:bg-primary/90 hover:shadow-md active:scale-[0.98]"
+          >
+            <Plus className="h-4 w-4" />
+            <span>New Entry</span>
+          </Link>
+        </div>
+      </header>
 
-      <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Journal entry</CardTitle>
-            <CardDescription>
-              Submit a short entry. The planner responds with JSON-only instructions for the browser agent.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-4" onSubmit={onSubmit}>
-              <div className="space-y-2">
-                <Label htmlFor="journal-editor">Entry</Label>
-                <JournalEditor
-                  onReadyChange={(ready) => {
-                    setEditorReady(ready);
-                  }}
-                  onInstanceChange={setEditorInstance}
-                />
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-xs text-muted-foreground">
-                  API base: <span className="font-medium text-foreground">{apiHint}</span>
-                </div>
-                <Button disabled={isSubmitting || !editorReady} type="submit">
-                  {isSubmitting ? "Submitting..." : "Submit entry"}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+      {/* Main content */}
+      <div className="mx-auto max-w-2xl px-6 py-6">
+        {/* Search */}
+        <div className="mb-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search entries..."
+              className="h-10 w-full rounded-lg border border-border bg-card pl-10 pr-4 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+        </div>
 
-        <Card className="h-fit">
-          <CardHeader>
-            <CardTitle>Results</CardTitle>
-            <CardDescription>
-              Planner JSON and the one-step browser agent output are displayed here.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {error ? (
-              <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {error}
-              </div>
-            ) : null}
-            {result ? (
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <h3 className="text-sm font-semibold">Planner response</h3>
-                  <pre className="custom-scroll max-h-64 overflow-auto rounded-md bg-muted/50 p-3 text-sm">
-                    {JSON.stringify(result.plan, null, 2)}
-                  </pre>
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-sm font-semibold">Execution</h3>
-                  <pre className="custom-scroll max-h-64 overflow-auto rounded-md bg-muted/50 p-3 text-sm">
-                    {JSON.stringify(result.execution ?? "No execution performed", null, 2)}
-                  </pre>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Submit an entry to see the planner decision and (if needed) a single browser-use step.
+        {/* Tappy greeting */}
+        <div className="mb-8 rounded-2xl bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 p-5">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-400 to-orange-500 shadow-md">
+              <span className="text-2xl">🦊</span>
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-foreground">Ready when you are</p>
+              <p className="text-sm text-muted-foreground">Write about your day and I&apos;ll help make things happen.</p>
+            </div>
+            <Link
+              href="/new"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+            >
+              <Plus className="h-5 w-5" />
+            </Link>
+          </div>
+        </div>
+
+        {/* Entries grid */}
+        <div className="grid grid-cols-2 gap-3">
+          {entries.map((entry) => (
+            <Link
+              key={entry.id}
+              href={`/entry/${entry.id}`}
+              className="group rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/30 hover:shadow-md"
+            >
+              <p className="text-xs text-muted-foreground mb-2">{formatDate(entry.date)}</p>
+              <p className="text-sm text-foreground line-clamp-4 leading-relaxed">
+                {entry.preview}
               </p>
-            )}
-          </CardContent>
-        </Card>
+              {entry.actionsTriggered > 0 && (
+                <div className="mt-3 flex items-center gap-1.5">
+                  <span className="text-sm">🦊</span>
+                  <span className="text-xs text-primary font-medium">
+                    {entry.actionsTriggered} action{entry.actionsTriggered !== 1 ? "s" : ""}
+                  </span>
+                </div>
+              )}
+            </Link>
+          ))}
+        </div>
+
+        {entries.length === 0 && (
+          <div className="text-center py-16">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-secondary">
+              <span className="text-3xl">📝</span>
+            </div>
+            <h3 className="text-lg font-medium text-foreground mb-1">No entries yet</h3>
+            <p className="text-sm text-muted-foreground mb-4">Start journaling and let Tappy help you take action.</p>
+            <Link
+              href="/new"
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Write your first entry</span>
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );
