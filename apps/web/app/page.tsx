@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Search, Clock, Sparkles, ArrowRight, FileText } from "lucide-react";
+import { Plus, Search, ArrowRight, FileText } from "lucide-react";
 import Link from "next/link";
 
 type JournalEntry = {
@@ -85,8 +85,6 @@ export default function JournalPage() {
   );
 
   const recentEntries = entries.slice(0, 5);
-  const totalActions = entries.reduce((sum, e) => sum + e.actionsTriggered, 0);
-  const streakDays = 7; // Mock streak
 
   const filteredEntries = searchQuery
     ? entries.filter(
@@ -187,34 +185,6 @@ export default function JournalPage() {
                 </div>
                 <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
               </Link>
-            </div>
-
-            {/* Stats Row */}
-            <div className="mb-10 grid grid-cols-3 gap-4">
-              <div className="rounded-xl border border-border bg-card p-4">
-                <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                  <Sparkles className="h-4 w-4" />
-                  <span className="text-xs font-medium uppercase tracking-wide">Actions</span>
-                </div>
-                <p className="text-2xl font-semibold text-foreground">{totalActions}</p>
-                <p className="text-xs text-muted-foreground">triggered by Tappy</p>
-              </div>
-              <div className="rounded-xl border border-border bg-card p-4">
-                <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                  <FileText className="h-4 w-4" />
-                  <span className="text-xs font-medium uppercase tracking-wide">Entries</span>
-                </div>
-                <p className="text-2xl font-semibold text-foreground">{entries.length}</p>
-                <p className="text-xs text-muted-foreground">journal entries</p>
-              </div>
-              <div className="rounded-xl border border-border bg-card p-4">
-                <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                  <Clock className="h-4 w-4" />
-                  <span className="text-xs font-medium uppercase tracking-wide">Streak</span>
-                </div>
-                <p className="text-2xl font-semibold text-foreground">{streakDays}</p>
-                <p className="text-xs text-muted-foreground">days in a row</p>
-              </div>
             </div>
 
             {/* Recent Entries */}

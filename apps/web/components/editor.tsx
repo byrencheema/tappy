@@ -17,9 +17,23 @@ export type EditorContent = {
 
 export function JournalEditor({ onReadyChange, onInstanceChange }: EditorProps) {
   const editorRef = useRef<EditorJS | null>(null);
+  const isInitializing = useRef(false);
   const [isReady, setIsReady] = useState(false);
 
+  // Store callbacks in refs to avoid dependency issues
+  const onReadyChangeRef = useRef(onReadyChange);
+  const onInstanceChangeRef = useRef(onInstanceChange);
+
   useEffect(() => {
+    onReadyChangeRef.current = onReadyChange;
+    onInstanceChangeRef.current = onInstanceChange;
+  }, [onReadyChange, onInstanceChange]);
+
+  useEffect(() => {
+    // Prevent double initialization in React Strict Mode
+    if (isInitializing.current || editorRef.current) return;
+    isInitializing.current = true;
+
     let isMounted = true;
 
     async function loadEditor() {
@@ -27,11 +41,16 @@ export function JournalEditor({ onReadyChange, onInstanceChange }: EditorProps) 
       const Header = (await import("@editorjs/header")).default;
       const List = (await import("@editorjs/list")).default;
 
+      if (!isMounted) return;
+
       const instance = new Editor({
         holder: "journal-editor",
         placeholder: "What's on your mind today?",
         autofocus: true,
         minHeight: 180,
+        data: {
+          blocks: []
+        },
         tools: {
           header: {
             class: Header,
@@ -53,26 +72,28 @@ export function JournalEditor({ onReadyChange, onInstanceChange }: EditorProps) 
         },
         onReady() {
           if (!isMounted) return;
+          editorRef.current = instance;
           setIsReady(true);
-          onReadyChange?.(true);
-          onInstanceChange?.(instance);
+          onReadyChangeRef.current?.(true);
+          onInstanceChangeRef.current?.(instance);
         },
       });
-
-      editorRef.current = instance;
     }
 
     loadEditor();
 
     return () => {
       isMounted = false;
-      void editorRef.current?.destroy?.();
-      editorRef.current = null;
-      onInstanceChange?.(null);
+      if (editorRef.current) {
+        editorRef.current.destroy();
+        editorRef.current = null;
+      }
+      isInitializing.current = false;
+      onInstanceChangeRef.current?.(null);
       setIsReady(false);
-      onReadyChange?.(false);
+      onReadyChangeRef.current?.(false);
     };
-  }, [onInstanceChange, onReadyChange]);
+  }, []);
 
   return (
     <div className="relative">
