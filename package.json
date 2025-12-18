@@ -1,0 +1,18 @@
+{
+  "name": "tappy",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "bun --filter tappy-web dev",
+    "dev:web": "bun --filter tappy-web dev",
+    "dev:api": "cd apps/api && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload",
+    "build": "bun --filter tappy-web build",
+    "build:web": "bun --filter tappy-web build",
+    "lint": "bun --filter tappy-web lint",
+    "lint:web": "bun --filter tappy-web lint"
+  },
+  "devDependencies": {}
+}
