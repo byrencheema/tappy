@@ -1,0 +1,13 @@
+node_modules
+.bun
+bun.lockb
+.next
+.env
+.env.local
+.env.*.local
+*.pyc
+__pycache__
+.venv
+.uv
+uv.lock
+.DS_Store

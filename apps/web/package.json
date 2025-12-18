@@ -1,0 +1,38 @@
+{
+  "name": "tappy-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun next dev",
+    "build": "bun next build",
+    "start": "bun next start",
+    "lint": "bun next lint"
+  },
+  "dependencies": {
+    "@editorjs/editorjs": "2.30.7",
+    "@editorjs/header": "2.8.1",
+    "@editorjs/list": "1.9.2",
+    "@radix-ui/react-label": "2.1.1",
+    "@radix-ui/react-slot": "1.1.1",
+    "class-variance-authority": "0.7.0",
+    "clsx": "2.1.1",
+    "lucide-react": "0.460.0",
+    "next": "14.2.14",
+    "next-themes": "0.3.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "tailwind-merge": "2.5.2"
+  },
+  "devDependencies": {
+    "@types/node": "20.17.10",
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "autoprefixer": "10.4.20",
+    "eslint": "8.57.1",
+    "eslint-config-next": "14.2.14",
+    "postcss": "8.4.49",
+    "tailwindcss-animate": "1.0.7",
+    "tailwindcss": "3.4.15",
+    "typescript": "5.6.3"
+  }
+}
