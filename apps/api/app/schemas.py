@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -70,36 +70,50 @@ class InboxItemResponse(BaseModel):
     journal_entry_id: Optional[int] = None
     journal_excerpt: Optional[str] = None
     created_at: datetime
+    skill_result: Optional[Dict[str, Any]] = Field(None, description="Result from skill execution")
 
     class Config:
         from_attributes = True
 
 
-# Planner/Execution Schemas (existing, moved here for organization)
-class PlannerAction(BaseModel):
-    """Action payload for the Browser Use agent."""
-    type: str = Field(..., description="Action type. Use 'browser_use' for browser automation.")
-    task: str = Field(..., description="Short task instruction for the Browser Use agent.")
-    skills: List[str] = Field(
-        ..., description="List of skill UUIDs available to the Browser Use agent."
-    )
+# Planner Schemas - Generic for any skill
+class SkillParameters(BaseModel):
+    """Generic parameters for skill execution - can be extended per skill."""
+    query: Optional[str] = Field(None, description="Generic query parameter")
+    limit: Optional[int] = Field(None, description="Generic limit parameter")
+
+    class Config:
+        extra = "allow"  # Allow additional fields for skill-specific parameters
 
 
 class PlannerResult(BaseModel):
     """Result from the planner analysis."""
-    should_act: bool = Field(..., description="Whether the executor should run a browser action.")
-    action: Optional[PlannerAction] = Field(
-        None,
-        description="Action payload for the Browser Use agent when should_act is true.",
-    )
+    should_act: bool = Field(..., description="Whether any skill should be executed")
+    skill_id: Optional[str] = Field(None, description="The skill UUID to execute")
+    skill_name: Optional[str] = Field(None, description="Human-readable skill name")
+    parameters: Optional[SkillParameters] = Field(None, description="Parameters for the skill")
+    reason: str = Field(..., description="Why this decision was made")
 
 
-class BrowserUseResult(BaseModel):
-    """Result from browser automation execution."""
-    status: str
-    reason: Optional[str] = None
-    detail: Optional[str] = None
+class SkillExecutionResult(BaseModel):
+    """Result from skill execution."""
+    status: str  # "completed", "failed", "pending", "running"
+    skill_id: Optional[str] = None
+    skill_name: Optional[str] = None
+    skill_type: Optional[str] = None
     output: Optional[Any] = None
+    error: Optional[str] = None
+    formatted_output: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class AgenticStep(BaseModel):
+    """A single step in the agentic workflow for frontend display."""
+    type: str = Field(..., description="Step type: planning, execution, formatting")
+    status: str = Field(..., description="Status: pending, running, completed, failed")
+    title: str = Field(..., description="Human-readable step title")
+    message: Optional[str] = Field(None, description="Details about this step")
+    timestamp: datetime = Field(default_factory=datetime.now)
 
 
 # Combined Journal Response (for POST /journal)
@@ -107,5 +121,6 @@ class JournalCreateResponse(BaseModel):
     """Response schema for creating a journal entry with analysis."""
     entry: JournalEntryResponse
     plan: PlannerResult
-    execution: Optional[BrowserUseResult] = None
+    execution: Optional[SkillExecutionResult] = None
     inbox_item: Optional[InboxItemResponse] = None
+    agentic_steps: List[AgenticStep] = Field(default_factory=list, description="Step-by-step progress")

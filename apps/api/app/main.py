@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import httpx
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, List, Optional
@@ -17,7 +18,6 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from .database import init_db, get_session
 from .models import JournalEntry, InboxItem
@@ -26,13 +26,15 @@ from .schemas import (
     JournalEntryResponse,
     JournalEntryListItem,
     JournalCreateResponse,
-    InboxItemCreate,
     InboxItemUpdate,
     InboxItemResponse,
-    PlannerAction,
     PlannerResult,
-    BrowserUseResult,
+    SkillParameters,
+    SkillExecutionResult,
+    AgenticStep,
 )
+from .skills import get_registry, SkillStatus
+from . import skill_definitions  # Auto-registers skills
 
 try:
     from google import genai
@@ -43,6 +45,18 @@ except Exception as exc:
     ) from exc
 
 
+# =============================================================================
+# SKILL CONFIGURATION
+# =============================================================================
+
+# Skills are now configured in skill_definitions.py
+# The registry auto-loads on import
+
+
+# =============================================================================
+# LIFESPAN & CONFIG
+# =============================================================================
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize database on startup."""
@@ -52,37 +66,66 @@ async def lifespan(app: FastAPI):
 
 def _get_allowed_origins() -> List[str]:
     origin = os.getenv("WEB_ORIGIN", "http://localhost:3000")
-    # Allow common dev ports
     return [origin, "http://localhost:3000", "http://localhost:3001"]
 
 
 def _get_genai_client() -> genai.Client:
-    """Get Gemini client via Vertex AI with Application Default Credentials."""
-    project = os.getenv("GOOGLE_CLOUD_PROJECT")
-    location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+    """Get Gemini client via Vertex AI with API Key authentication."""
+    api_key = os.getenv("GOOGLE_CLOUD_API_KEY")
 
-    if not project:
+    if not api_key:
         raise HTTPException(
             status_code=500,
-            detail="GOOGLE_CLOUD_PROJECT is not configured"
+            detail="GOOGLE_CLOUD_API_KEY is not configured"
         )
 
-    return genai.Client(vertexai=True, project=project, location=location)
+    return genai.Client(vertexai=True, api_key=api_key)
 
+
+# =============================================================================
+# PLANNER - Detects when to execute skills
+# =============================================================================
 
 def _planner_prompt(text: str) -> str:
-    return (
-        "You are an action planner for a browser agent. "
-        "Read the journal entry and decide if a browser automation action is required. "
-        "Respond strictly with a JSON object matching this schema: "
-        "{\"should_act\": boolean, \"action\": {\"type\": string, \"task\": string, \"skills\": string[]} | null}. "
-        "If an action is needed, set should_act to true and action.type to 'browser_use'. "
-        "Populate action.task with a concise objective. "
-        "Populate action.skills with placeholder UUID strings (e.g., 'REPLACE_ME_SKILL_UUID_1', 'REPLACE_ME_SKILL_UUID_2') that should be replaced later. "
-        "If no action is needed, set should_act to false and action to null. "
-        "Do not include any additional keys, prose, or markdown—only output JSON.\n\n"
-        f"Journal entry: {text}"
-    )
+    """
+    Generate planner prompt dynamically based on registered skills.
+    The AI decides if the journal entry warrants any skill execution.
+    """
+    registry = get_registry()
+    skills_context = registry.get_planner_context()
+
+    # Get all skills for JSON schema examples
+    skills = registry.list_skills()
+    skill_examples = []
+    for skill in skills:
+        skill_examples.append(f'  - skill_id: "{skill.id}", skill_name: "{skill.name}"')
+
+    return f"""You are Tappy, a helpful journal assistant that can take actions for users.
+
+{skills_context}
+
+Your task: Analyze the journal entry and decide if any skill should be executed.
+
+IMPORTANT RULES:
+- Only trigger a skill if the user clearly expresses intent related to that skill
+- Regular mentions or complaints don't warrant action
+- Extract specific parameters from the journal text when possible
+- Be conservative - when in doubt, don't act
+
+Respond with JSON only:
+{{
+  "should_act": true or false,
+  "skill_id": "skill-uuid" or null,
+  "skill_name": "skill_name" or null,
+  "parameters": {{parameter_object}} or null,
+  "reason": "Brief explanation of your decision"
+}}
+
+Available skill IDs:
+{chr(10).join(skill_examples)}
+
+Journal entry:
+{text}"""
 
 
 def _extract_response_text(response: Any) -> str:
@@ -96,55 +139,111 @@ def _extract_response_text(response: Any) -> str:
 
 
 def _parse_plan(raw_text: str) -> PlannerResult:
+    """Parse the planner's JSON response into a PlannerResult."""
     try:
         payload = json.loads(raw_text)
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=502, detail=f"Planner returned invalid JSON: {exc}")
-    return PlannerResult.model_validate(payload)
-
-
-async def _execute_browser_action(action: PlannerAction) -> BrowserUseResult:
-    """Invoke the Browser Use agent when planning requests it."""
-    try:
-        from browser_use import Agent, ChatBrowserUse
-        from browser_use.browser import Browser, BrowserConfig
-    except Exception as exc:
-        return BrowserUseResult(
-            status="skipped",
-            reason="browser-use is not installed. Run `uvx browser-use install` to enable execution.",
-            detail=str(exc),
-        )
-
-    api_key = os.getenv("BROWSER_USE_API_KEY")
-    browser_config = {"headless": True}
-    if api_key:
-        browser_config["api_key"] = api_key
-        browser_config.setdefault("use_cloud", True)
-
-    try:
-        browser = Browser(config=BrowserConfig(**browser_config))
-        llm = ChatBrowserUse()
-        agent = Agent(task=action.task, browser=browser, llm=llm, skills=action.skills)
-        result = await agent.run(max_steps=1)
-    except Exception as exc:
-        return BrowserUseResult(status="failed", reason=str(exc))
-
-    if hasattr(result, "model_dump"):
-        return BrowserUseResult(status="completed", output=result.model_dump())
-
-    return BrowserUseResult(status="completed", output=str(result))
+    
+    # Handle parameters
+    params = None
+    if payload.get("parameters"):
+        params = SkillParameters(**payload["parameters"])
+    
+    return PlannerResult(
+        should_act=payload.get("should_act", False),
+        skill_id=payload.get("skill_id"),
+        skill_name=payload.get("skill_name"),
+        parameters=params,
+        reason=payload.get("reason", "No reason provided"),
+    )
 
 
 async def _plan_action(text: str) -> PlannerResult:
+    """Run the planner to decide if we should execute a skill."""
     client = _get_genai_client()
     response = client.models.generate_content(
-        model=os.getenv("GENAI_MODEL", "gemini-3.0-flash"),
+        model=os.getenv("GENAI_MODEL", "gemini-2.0-flash"),
         contents=[_planner_prompt(text)],
         config=types.GenerateContentConfig(response_mime_type="application/json"),
     )
     raw_text = _extract_response_text(response)
     return _parse_plan(raw_text)
 
+
+# =============================================================================
+# SKILL EXECUTION - Registry-based
+# =============================================================================
+
+async def _execute_skill(skill_id: str, parameters: dict) -> SkillExecutionResult:
+    """
+    Execute a skill using the registry system.
+    Supports any registered skill with its own parameter schema.
+    """
+    registry = get_registry()
+    handler = registry.get_handler(skill_id)
+    config = registry.get_config(skill_id)
+
+    if not handler or not config:
+        return SkillExecutionResult(
+            status="failed",
+            skill_id=skill_id,
+            error=f"Skill {skill_id} is not registered"
+        )
+
+    # Check for test mode (skip actual API call)
+    if os.getenv("SKILLS_TEST_MODE") == "true":
+        print(f"[TEST MODE] Would execute skill {config.name} with params: {parameters}")
+        from .skills import SkillStatus as SS
+        return SkillExecutionResult(
+            status=SS.COMPLETED.value,
+            skill_id=skill_id,
+            skill_name=config.name,
+            skill_type=config.skill_type.value,
+            output={
+                "result": {
+                    "data": {
+                        "jobs": [
+                            {"title": "Test ML Engineer", "company": "Test Corp", "location": "San Francisco", "salary_summary": "$150k-$200k"},
+                            {"title": "Test AI Researcher", "company": "Test AI", "location": "Remote", "salary_summary": "$180k-$220k"}
+                        ],
+                        "count": 2
+                    }
+                }
+            },
+            metadata={"test_mode": True}
+        )
+
+    api_key = os.getenv("BROWSER_USE_API_KEY")
+    if not api_key:
+        return SkillExecutionResult(
+            status="failed",
+            skill_id=skill_id,
+            error="BROWSER_USE_API_KEY is not configured. Get one at https://cloud.browser-use.com"
+        )
+
+    try:
+        # Parse parameters using skill's parameter schema
+        param_instance = config.parameter_schema(**parameters)
+
+        # Execute via handler
+        print(f"Executing skill {config.name} with params: {parameters}")
+        result = await handler.execute(param_instance, api_key)
+        print(f"Skill execution result: status={result.status}")
+        return result
+
+    except Exception as exc:
+        print(f"Skill execution error: {exc}")
+        return SkillExecutionResult(
+            status="failed",
+            skill_id=skill_id,
+            error=f"Execution error: {str(exc)}"
+        )
+
+
+# =============================================================================
+# HELPERS
+# =============================================================================
 
 def _extract_title_from_content(content_json: str) -> Optional[str]:
     """Extract title from first header block in Editor.js content."""
@@ -165,7 +264,11 @@ def _get_preview(text: str, max_length: int = 150) -> str:
     return text[:max_length].rsplit(" ", 1)[0] + "..."
 
 
-app = FastAPI(title="Tappy Journal API", version="0.1.0", lifespan=lifespan)
+# =============================================================================
+# FASTAPI APP
+# =============================================================================
+
+app = FastAPI(title="Tappy Journal API", version="0.2.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_get_allowed_origins(),
@@ -190,7 +293,6 @@ async def list_journal_entries(
     offset: int = 0,
 ) -> List[JournalEntryListItem]:
     """List all journal entries, newest first."""
-    # Get entries with action count
     stmt = (
         select(
             JournalEntry,
@@ -254,7 +356,7 @@ async def create_journal_entry(
     payload: JournalEntryCreate,
     session: AsyncSession = Depends(get_session),
 ) -> JournalCreateResponse:
-    """Create a new journal entry, analyze it, and optionally create inbox items."""
+    """Create a new journal entry, analyze it, and optionally execute skills."""
     # Use explicit title if provided, otherwise extract from content
     title = payload.title or _extract_title_from_content(payload.content_json)
 
@@ -268,44 +370,99 @@ async def create_journal_entry(
     await session.commit()
     await session.refresh(entry)
 
-    # Run the planner (optional - don't fail if API key missing)
+    # Track agentic workflow steps
+    agentic_steps = []
+
+    # Step 1: Planning
     plan = None
     execution = None
     inbox_item_response = None
 
+    agentic_steps.append(AgenticStep(
+        type="planning",
+        status="running",
+        title="Analyzing journal entry",
+        message="Determining if any actions should be taken..."
+    ))
+
     try:
         plan = await _plan_action(payload.text)
+        agentic_steps[-1].status = "completed"
+        agentic_steps[-1].message = plan.reason
     except Exception as e:
-        # Log but don't fail - entry is already saved
         print(f"Planner failed (entry still saved): {e}")
-        plan = PlannerResult(should_act=False, action=None)
-
-    if plan.should_act and plan.action:
-        execution = await _execute_browser_action(plan.action)
-
-        # Create inbox item for the action
-        inbox_item = InboxItem(
-            journal_entry_id=entry.id,
-            title=f"Action: {plan.action.task[:50]}",
-            message=plan.action.task,
-            action="View details",
-            status="needs_confirmation" if execution.status == "completed" else "pending",
-            journal_excerpt=payload.text[:200] if len(payload.text) > 200 else payload.text,
+        plan = PlannerResult(
+            should_act=False,
+            skill_id=None,
+            skill_name=None,
+            parameters=None,
+            reason=f"Planner error: {str(e)}"
         )
-        session.add(inbox_item)
-        await session.commit()
-        await session.refresh(inbox_item)
+        agentic_steps[-1].status = "failed"
+        agentic_steps[-1].message = f"Planning failed: {str(e)}"
 
-        inbox_item_response = InboxItemResponse(
-            id=inbox_item.id,
-            title=inbox_item.title,
-            message=inbox_item.message,
-            action=inbox_item.action,
-            status=inbox_item.status,
-            journal_entry_id=inbox_item.journal_entry_id,
-            journal_excerpt=inbox_item.journal_excerpt,
-            created_at=inbox_item.created_at,
-        )
+    # Execute skill if planner says to act
+    if plan.should_act and plan.skill_id and plan.parameters:
+        # Step 2: Execution
+        agentic_steps.append(AgenticStep(
+            type="execution",
+            status="running",
+            title=f"Executing {plan.skill_name or 'skill'}",
+            message=f"Running skill with parameters..."
+        ))
+
+        # Convert SkillParameters to dict for registry
+        params_dict = plan.parameters.model_dump(exclude_none=True) if plan.parameters else {}
+        execution = await _execute_skill(plan.skill_id, params_dict)
+
+        if execution.status == SkillStatus.COMPLETED.value:
+            agentic_steps[-1].status = "completed"
+            agentic_steps[-1].message = "Skill executed successfully"
+        else:
+            agentic_steps[-1].status = "failed"
+            agentic_steps[-1].message = execution.error or "Execution failed"
+
+        # Step 3: Formatting
+        agentic_steps.append(AgenticStep(
+            type="formatting",
+            status="running",
+            title="Formatting results",
+            message="Preparing inbox item..."
+        ))
+
+        # Format results using registry handler
+        registry = get_registry()
+        handler = registry.get_handler(plan.skill_id)
+
+        if handler:
+            formatted = handler.format_result(execution)
+
+            inbox_item = InboxItem(
+                journal_entry_id=entry.id,
+                title=formatted.title[:255],
+                message=formatted.message,
+                action=formatted.action,
+                status=formatted.status,
+                journal_excerpt=payload.text[:200] if len(payload.text) > 200 else payload.text,
+            )
+            session.add(inbox_item)
+            await session.commit()
+            await session.refresh(inbox_item)
+
+            inbox_item_response = InboxItemResponse(
+                id=inbox_item.id,
+                title=inbox_item.title,
+                message=inbox_item.message,
+                action=inbox_item.action,
+                status=inbox_item.status,
+                journal_entry_id=inbox_item.journal_entry_id,
+                journal_excerpt=inbox_item.journal_excerpt,
+                created_at=inbox_item.created_at,
+                skill_result=execution.output if execution.status == SkillStatus.COMPLETED.value else None,
+            )
+
+            agentic_steps[-1].status = "completed"
+            agentic_steps[-1].message = "Created inbox item"
 
     entry_response = JournalEntryResponse(
         id=entry.id,
@@ -321,6 +478,7 @@ async def create_journal_entry(
         plan=plan,
         execution=execution,
         inbox_item=inbox_item_response,
+        agentic_steps=agentic_steps,
     )
 
 
@@ -415,7 +573,6 @@ async def update_inbox_item(
     if not item:
         raise HTTPException(status_code=404, detail="Inbox item not found")
 
-    # Update only provided fields
     if payload.status is not None:
         item.status = payload.status
     if payload.title is not None:

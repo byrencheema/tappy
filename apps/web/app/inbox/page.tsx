@@ -145,7 +145,9 @@ export default function InboxPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-foreground truncate">{item.title}</p>
-                          <p className="text-sm text-muted-foreground truncate">{item.message}</p>
+                          <p className="text-sm text-muted-foreground truncate">
+                            {item.message.split('\n')[0].replace(/^[•\-\*]\s*/, '')}
+                          </p>
                         </div>
                         <span className="text-xs text-muted-foreground flex-shrink-0">
                           {formatTimestamp(item.created_at)}
@@ -161,7 +163,10 @@ export default function InboxPage() {
                       {isExpanded && (
                         <div className="px-4 pb-4 pt-0 border-t border-border">
                           <div className="pt-4 space-y-4">
-                            <p className="text-sm text-foreground leading-relaxed">{item.message}</p>
+                            {/* Message with preserved formatting */}
+                            <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap font-mono bg-secondary/30 rounded-lg p-3">
+                              {item.message}
+                            </div>
 
                             {item.journal_excerpt && (
                               <div className="rounded-lg bg-secondary/50 p-3 text-sm">
