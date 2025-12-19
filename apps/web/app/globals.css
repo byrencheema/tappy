@@ -104,9 +104,17 @@
   }
 }
 
-/* Journal Editor - Clean, minimal writing experience */
+/* ===========================================
+   Journal Editor - Notion-like writing experience
+   =========================================== */
+
+/* Editor container */
+.journal-editor-wrapper.notion-style {
+  position: relative;
+}
+
 .codex-editor__redactor {
-  padding-bottom: 200px !important;
+  padding-bottom: 300px !important;
 }
 
 .ce-block__content,
@@ -114,72 +122,114 @@
   max-width: 100%;
 }
 
+/* Paragraph styling - clean and readable */
 .ce-paragraph {
-  @apply text-base leading-relaxed;
-  line-height: 1.8;
   font-size: 16px;
+  line-height: 1.8;
+  color: hsl(var(--foreground) / 0.9);
+  letter-spacing: -0.01em;
 }
 
+.ce-paragraph:focus {
+  outline: none;
+}
+
+/* Headers - bold and clear hierarchy */
 .ce-header {
-  @apply font-semibold tracking-tight;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: hsl(var(--foreground));
 }
 
 h1.ce-header {
-  @apply text-3xl mt-8 mb-4;
+  font-size: 1.875rem;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  line-height: 1.2;
 }
 
 h2.ce-header {
-  @apply text-2xl mt-6 mb-3;
+  font-size: 1.5rem;
+  margin-top: 1.75rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.25;
 }
 
 h3.ce-header {
-  @apply text-xl mt-5 mb-2;
+  font-size: 1.25rem;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.3;
 }
 
+/* Lists */
 .cdx-list {
-  @apply text-base leading-relaxed pl-6;
+  font-size: 16px;
   line-height: 1.8;
+  padding-left: 1.5rem;
 }
 
 .cdx-list__item {
-  @apply py-1;
+  padding: 0.25rem 0;
 }
 
+/* Placeholder styling */
 .ce-paragraph[data-placeholder]:empty::before,
 .ce-paragraph[data-placeholder-active]:empty::before {
-  @apply text-muted-foreground;
-  opacity: 0.5;
+  color: hsl(var(--muted-foreground));
+  opacity: 0.4;
+  font-style: normal;
 }
 
-/* Minimal toolbar styling */
+/* Toolbar - minimal and elegant */
+.ce-toolbar {
+  z-index: 10;
+}
+
 .ce-toolbar__plus,
 .ce-toolbar__settings-btn {
-  @apply bg-background border border-border rounded-lg shadow-sm;
-  @apply hover:bg-secondary transition-colors;
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
   color: hsl(var(--muted-foreground));
+  transition: all 0.15s ease;
 }
 
 .ce-toolbar__plus:hover,
 .ce-toolbar__settings-btn:hover {
+  background: hsl(var(--secondary));
   color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
 }
 
+/* Inline toolbar - floating and polished */
 .ce-inline-toolbar {
-  @apply bg-popover border border-border shadow-lg rounded-xl overflow-hidden;
+  background: hsl(var(--popover));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+  border-radius: 10px;
+  overflow: hidden;
 }
 
 .ce-inline-tool {
-  @apply hover:bg-secondary transition-colors;
+  color: hsl(var(--foreground));
+  transition: background 0.15s ease;
+}
+
+.ce-inline-tool:hover {
+  background: hsl(var(--secondary));
 }
 
 .ce-inline-tool--active {
-  @apply bg-secondary;
+  background: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
 }
 
-/* Hide toolbar indicators for cleaner look */
+/* Toolbar visibility - only show on hover/focus */
 .ce-toolbar__actions {
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity 0.2s ease;
 }
 
 .ce-block:hover .ce-toolbar__actions,
@@ -187,17 +237,94 @@ h3.ce-header {
   opacity: 1;
 }
 
+/* Block focus state */
+.ce-block--focused .ce-block__content {
+  background: transparent;
+}
+
 /* Popover menus */
 .ce-popover {
-  @apply bg-popover border border-border shadow-lg rounded-xl overflow-hidden;
+  background: hsl(var(--popover));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ce-popover__item {
+  border-radius: 6px;
+  margin: 4px;
 }
 
 .ce-popover-item:hover {
-  @apply bg-secondary;
+  background: hsl(var(--secondary));
 }
 
 .ce-popover-item__icon {
-  @apply bg-secondary rounded-lg;
+  background: hsl(var(--secondary));
+  border-radius: 8px;
+}
+
+.ce-popover-item__title {
+  font-weight: 500;
+}
+
+/* Conversion toolbar */
+.ce-conversion-toolbar {
+  background: hsl(var(--popover));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+  border-radius: 10px;
+}
+
+.ce-conversion-tool:hover {
+  background: hsl(var(--secondary));
+}
+
+/* Link tool */
+.ce-inline-tool-input {
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  color: hsl(var(--foreground));
+}
+
+.ce-inline-tool-input:focus {
+  border-color: hsl(var(--primary));
+  outline: none;
+}
+
+/* Prose content for view mode */
+.prose-content {
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.prose-content a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.prose-content a:hover {
+  text-decoration-thickness: 2px;
+}
+
+.prose-content strong {
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.prose-content em {
+  font-style: italic;
+}
+
+.prose-content code {
+  background: hsl(var(--secondary));
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 /* Clean scrollbar */

@@ -1,49 +1,91 @@
-# Tappy monorepo
+# Tappy
 
-A lightweight monorepo containing a Next.js web client and FastAPI backend for a journal-driven planner/executor flow that can hand tasks to a Browser Use agent.
+**The world's first personal journal that takes action.**
 
-## Structure
-- `apps/web`: Next.js (App Router, TypeScript, Tailwind, shadcn/ui) powered by Bun.
-- `apps/api`: FastAPI service orchestrating Gemini planning and optional Browser Use execution.
+Write about your life, and Tappy—your AI life assistant—makes things happen. Mention you want to lose weight? Tappy finds local 5K runs and gym deals. Planning an anniversary dinner? Tappy books the reservation. It reads between the lines of your journal entries and proactively helps with life's tasks.
 
-## Prerequisites
-- [Bun](https://bun.sh/) for the web app.
-- [uv](https://github.com/astral-sh/uv) for Python dependency management.
-- Access to Google Gemini via the Google GenAI SDK.
+## How it works
 
-## Environment
-Create `.env` files from the provided examples:
+1. **Journal** — Write naturally about your day, thoughts, goals, or anything on your mind
+2. **Tappy analyzes** — Our AI reads your entries and identifies actionable opportunities
+3. **Actions go to Inbox** — Tappy sends you friendly notifications about what it found or did
+4. **You confirm** — Approve actions that need your OK, or just let Tappy handle the rest
+
+## Example
+
+> *"Had a rough day at work. Really need to decompress this weekend. Sarah mentioned wanting to try that new Italian place downtown. Oh, and I keep forgetting to cancel that gym membership I never use..."*
+
+Tappy might:
+- Find availability at the Italian restaurant and offer to book a table
+- Look up weekend wellness activities nearby
+- Draft a gym cancellation request for your review
+
+## Project Structure
 
 ```
+apps/
+├── web/     Next.js frontend (Bun, TypeScript, Tailwind)
+└── api/     FastAPI backend (Python, Gemini, Browser Use)
+```
+
+## Tech Stack
+
+- **Frontend**: Next.js 14, TypeScript, Tailwind CSS, Editor.js
+- **Backend**: FastAPI, Google Gemini for intent analysis, Browser Use for web automation
+- **Styling**: Custom warm editorial design with Crimson Pro + Source Sans 3 fonts
+
+## Getting Started
+
+### Prerequisites
+- [Bun](https://bun.sh/) for the web app
+- [uv](https://github.com/astral-sh/uv) for Python dependencies
+- Google Gemini API access
+
+### Environment Setup
+
+```bash
 cp apps/web/.env.example apps/web/.env.local
 cp apps/api/.env.example apps/api/.env
 ```
 
-Variables you will need:
-- `GEMINI_API_KEY`: Required for planner calls.
-- `BROWSER_USE_API_KEY`: Optional key passed to Browser Use.
-- `WEB_ORIGIN`: Origin allowed by API CORS (defaults to `http://localhost:3000`).
-- `GENAI_MODEL`: Model name for planning (defaults to `gemini-1.5-flash`).
-- `NEXT_PUBLIC_API_BASE_URL`: Base URL the web client calls (defaults to `http://localhost:8000`).
+Required variables:
+- `GEMINI_API_KEY` — For AI intent analysis
+- `BROWSER_USE_API_KEY` — For web automation (optional)
+- `NEXT_PUBLIC_API_BASE_URL` — API endpoint (default: `http://localhost:8000`)
 
-## Running the apps
+### Run the API
 
-### API (FastAPI + uv)
-```
+```bash
 cd apps/api
 uv sync
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
-- Optional: install the browser agent locally with `uvx browser-use install`. When `BROWSER_USE_API_KEY` is set, the executor enables Browser Use Cloud for better performance.
 
-### Web (Next.js + Bun)
-```
+### Run the Web App
+
+```bash
 cd apps/web
 bun install
-bun run dev
+bun dev
 ```
-Visit `http://localhost:3000` and ensure `NEXT_PUBLIC_API_BASE_URL` matches the API host/port.
 
-## Notes
-- The planner prompt enforces JSON-only responses and returns stub skill UUIDs for Browser Use. Replace them with real skill IDs when available.
-- The executor runs a single Browser Use step when `should_act` is `true` and otherwise skips execution.
+Visit `http://localhost:3000`
+
+## Features
+
+- **Rich text journal editor** — Notion-like writing experience with headers, lists, and formatting
+- **Smart intent detection** — AI understands context and identifies opportunities to help
+- **Inbox notifications** — Friendly messages from Tappy about actions taken or needing approval
+- **Browser automation** — Tappy can search the web, fill forms, and complete tasks for you
+
+## Roadmap
+
+- [ ] User authentication
+- [ ] Journal entry history
+- [ ] More Browser Use skills (email, calendar, shopping)
+- [ ] Mobile app
+- [ ] Voice journal entries
+
+---
+
+Built with care by humans (and a helpful fox named Tappy)

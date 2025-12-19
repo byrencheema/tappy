@@ -45,9 +45,9 @@ export function JournalEditor({ onReadyChange, onInstanceChange }: EditorProps) 
 
       const instance = new Editor({
         holder: "journal-editor",
-        placeholder: "What's on your mind today?",
-        autofocus: true,
-        minHeight: 180,
+        placeholder: "Start writing, or press '/' for commands...",
+        autofocus: false,
+        minHeight: 300,
         data: {
           blocks: []
         },

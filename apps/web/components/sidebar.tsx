@@ -1,10 +1,19 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BookOpen, Inbox } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-const navigation = [
+type NavigationItem = {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+  badge?: number;
+};
+
+const navigation: NavigationItem[] = [
   {
     name: "Journal",
     href: "/",
@@ -14,7 +23,6 @@ const navigation = [
     name: "Inbox",
     href: "/inbox",
     icon: Inbox,
-    badge: 3,
   },
 ];
 
@@ -26,8 +34,8 @@ export function Sidebar() {
       <div className="flex h-full flex-col">
         {/* Logo */}
         <div className="flex h-16 items-center gap-3 px-5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-orange-400 to-orange-500 shadow-sm">
-            <span className="text-xl">🦊</span>
+          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl">
+            <Image src="/tappy_mascot.png" alt="Tappy" width={40} height={40} className="object-cover" />
           </div>
           <div>
             <h1 className="text-base font-semibold text-sidebar-foreground">Tappy</h1>
@@ -69,7 +77,7 @@ export function Sidebar() {
         <div className="p-3">
           <div className="rounded-xl bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30 p-4">
             <div className="flex items-start gap-3">
-              <span className="text-2xl">🦊</span>
+              <Image src="/tappy_mascot.png" alt="Tappy" width={32} height={32} className="flex-shrink-0" />
               <div>
                 <p className="text-sm font-medium text-foreground">Tappy is ready</p>
                 <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">

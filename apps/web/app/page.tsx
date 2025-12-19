@@ -1,55 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Search, ArrowRight, FileText } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Search, ArrowRight, FileText, Loader2 } from "lucide-react";
 import Link from "next/link";
-
-type JournalEntry = {
-  id: string;
-  date: Date;
-  preview: string;
-  actionsTriggered: number;
-  title?: string;
-};
-
-// Mock data - would come from API
-const mockEntries: JournalEntry[] = [
-  {
-    id: "1",
-    date: new Date(),
-    title: "Morning reflection",
-    preview: "Had a great workout today. Feeling motivated to keep up the routine. Also need to remember to call mom this weekend...",
-    actionsTriggered: 2,
-  },
-  {
-    id: "2",
-    date: new Date(Date.now() - 86400000),
-    title: "Project update",
-    preview: "Work was busy but productive. The new project is coming along nicely. Thinking about taking a vacation next month...",
-    actionsTriggered: 1,
-  },
-  {
-    id: "3",
-    date: new Date(Date.now() - 86400000 * 2),
-    title: "Reading goals",
-    preview: "Finally finished reading that book I've been putting off. Really need to start eating healthier, maybe try meal prep...",
-    actionsTriggered: 3,
-  },
-  {
-    id: "4",
-    date: new Date(Date.now() - 86400000 * 5),
-    title: "Anniversary planning",
-    preview: "Anniversary coming up next week. Should plan something special for dinner. Also need to renew gym membership...",
-    actionsTriggered: 2,
-  },
-  {
-    id: "5",
-    date: new Date(Date.now() - 86400000 * 7),
-    title: "Weekly review",
-    preview: "Looking back at this week. Made good progress on the side project. Need to focus more on sleep schedule...",
-    actionsTriggered: 0,
-  },
-];
+import { journalApi } from "@/lib/api";
+import type { JournalEntryListItem } from "@/types/api";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -58,7 +13,8 @@ function getGreeting() {
   return "Good evening";
 }
 
-function formatDate(date: Date) {
+function formatDate(dateString: string) {
+  const date = new Date(dateString);
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
@@ -72,17 +28,38 @@ function formatDate(date: Date) {
   return date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
 }
 
-function formatTime(date: Date) {
+function formatTime(dateString: string) {
+  const date = new Date(dateString);
   return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
 export default function JournalPage() {
-  const [entries] = useState<JournalEntry[]>(mockEntries);
+  const [entries, setEntries] = useState<JournalEntryListItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const todayEntry = entries.find(
-    (e) => e.date.toDateString() === new Date().toDateString()
-  );
+  useEffect(() => {
+    async function loadEntries() {
+      try {
+        setIsLoading(true);
+        const data = await journalApi.list();
+        setEntries(data);
+      } catch (err) {
+        console.error("Failed to load entries:", err);
+        setError("Failed to load entries");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadEntries();
+  }, []);
+
+  const today = new Date();
+  const todayEntry = entries.find((e) => {
+    const entryDate = new Date(e.created_at);
+    return entryDate.toDateString() === today.toDateString();
+  });
 
   const recentEntries = entries.slice(0, 5);
 
@@ -118,8 +95,28 @@ export default function JournalPage() {
       </header>
 
       <div className="mx-auto max-w-4xl px-6 py-8">
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && !isLoading && (
+          <div className="text-center py-16">
+            <p className="text-destructive">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 text-sm text-primary hover:underline"
+            >
+              Try again
+            </button>
+          </div>
+        )}
+
         {/* Search Results */}
-        {filteredEntries && (
+        {!isLoading && !error && filteredEntries && (
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-medium text-muted-foreground">
@@ -143,7 +140,7 @@ export default function JournalPage() {
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-foreground">{entry.title || "Untitled"}</p>
                     <p className="text-sm text-muted-foreground line-clamp-1">{entry.preview}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{formatDate(entry.date)}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{formatDate(entry.created_at)}</p>
                   </div>
                 </Link>
               ))}
@@ -151,8 +148,8 @@ export default function JournalPage() {
           </div>
         )}
 
-        {/* Main Content - Hidden when searching */}
-        {!filteredEntries && (
+        {/* Main Content - Hidden when searching or loading */}
+        {!isLoading && !error && !filteredEntries && (
           <>
             {/* Greeting Section */}
             <div className="mb-10">
@@ -193,12 +190,14 @@ export default function JournalPage() {
                 <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
                   Recently viewed
                 </h2>
-                <Link
-                  href="/entries"
-                  className="text-sm text-primary hover:underline"
-                >
-                  View all
-                </Link>
+                {entries.length > 5 && (
+                  <Link
+                    href="/entries"
+                    className="text-sm text-primary hover:underline"
+                  >
+                    View all
+                  </Link>
+                )}
               </div>
 
               {recentEntries.length === 0 ? (
@@ -234,9 +233,9 @@ export default function JournalPage() {
                           <p className="font-medium text-foreground truncate">
                             {entry.title || "Untitled"}
                           </p>
-                          {entry.actionsTriggered > 0 && (
+                          {entry.actions_triggered > 0 && (
                             <span className="flex-shrink-0 text-xs text-primary">
-                              🦊 {entry.actionsTriggered}
+                              {entry.actions_triggered} action{entry.actions_triggered !== 1 ? "s" : ""}
                             </span>
                           )}
                         </div>
@@ -245,8 +244,8 @@ export default function JournalPage() {
                         </p>
                       </div>
                       <div className="flex-shrink-0 text-right">
-                        <p className="text-xs text-muted-foreground">{formatDate(entry.date)}</p>
-                        <p className="text-xs text-muted-foreground">{formatTime(entry.date)}</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(entry.created_at)}</p>
+                        <p className="text-xs text-muted-foreground">{formatTime(entry.created_at)}</p>
                       </div>
                     </Link>
                   ))}
