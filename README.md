@@ -31,15 +31,24 @@ apps/
 ## Tech Stack
 
 - **Frontend**: Next.js 14, TypeScript, Tailwind CSS, Editor.js
-- **Backend**: FastAPI, Google Gemini for intent analysis, Browser Use for web automation
-- **Styling**: Custom warm editorial design with Crimson Pro + Source Sans 3 fonts
+- **Backend**: FastAPI, Google Gemini (Vertex AI), Browser Use for web automation
+- **Database**: SQLite with SQLAlchemy async
+- **Styling**: Custom warm terracotta/amber theme with Crimson Pro + Source Sans 3 fonts
+
+## Current Status
+
+- SQLite database integration for journal entries and inbox items
+- Vertex AI with Gemini 2.0/3.0 Flash for intent analysis
+- Auto-creation of inbox items when actions are detected in journal entries
+- Full CRUD API for journal and inbox management
+- Two-page UI: Journal (home) and Inbox
 
 ## Getting Started
 
 ### Prerequisites
 - [Bun](https://bun.sh/) for the web app
 - [uv](https://github.com/astral-sh/uv) for Python dependencies
-- Google Gemini API access
+- Google Cloud account with Vertex AI enabled (or Gemini API key)
 
 ### Environment Setup
 
@@ -48,10 +57,26 @@ cp apps/web/.env.example apps/web/.env.local
 cp apps/api/.env.example apps/api/.env
 ```
 
-Required variables:
+#### API Environment Variables
+
+For Vertex AI (recommended, uses Application Default Credentials):
+```bash
+GOOGLE_CLOUD_PROJECT=your-project-id
+GOOGLE_CLOUD_LOCATION=us-central1
+GENAI_MODEL=gemini-2.0-flash
+```
+
+Authenticate with:
+```bash
+gcloud auth application-default login
+```
+
+Alternative (API key):
 - `GEMINI_API_KEY` — For AI intent analysis
-- `BROWSER_USE_API_KEY` — For web automation (optional)
-- `NEXT_PUBLIC_API_BASE_URL` — API endpoint (default: `http://localhost:8000`)
+
+Optional:
+- `BROWSER_USE_API_KEY` — For web automation
+- `WEB_ORIGIN` — CORS origin (default: `http://localhost:3000`)
 
 ### Run the API
 
@@ -74,15 +99,29 @@ Visit `http://localhost:3000`
 ## Features
 
 - **Rich text journal editor** — Notion-like writing experience with headers, lists, and formatting
-- **Smart intent detection** — AI understands context and identifies opportunities to help
+- **Smart intent detection** — Gemini AI analyzes entries and identifies actionable opportunities
 - **Inbox notifications** — Friendly messages from Tappy about actions taken or needing approval
-- **Browser automation** — Tappy can search the web, fill forms, and complete tasks for you
+- **Persistent storage** — All journal entries and inbox items saved to SQLite
+- **Browser automation** — Tappy can search the web, fill forms, and complete tasks for you (via Browser Use)
+
+## API Endpoints
+
+### Journal
+- `GET /journal` — List all journal entries
+- `GET /journal/{id}` — Get a single entry
+- `POST /journal` — Create entry (triggers AI analysis)
+- `DELETE /journal/{id}` — Delete entry
+
+### Inbox
+- `GET /inbox` — List all inbox items
+- `GET /inbox/{id}` — Get a single item
+- `PUT /inbox/{id}` — Update item (e.g., change status)
+- `DELETE /inbox/{id}` — Delete item
 
 ## Roadmap
 
 - [ ] User authentication
-- [ ] Journal entry history
-- [ ] More Browser Use skills (email, calendar, shopping)
+- [ ] Browser Use skills (email, calendar, shopping)
 - [ ] Mobile app
 - [ ] Voice journal entries
 
