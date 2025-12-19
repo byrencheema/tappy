@@ -1,9 +1,9 @@
 "use client";
 
-import { type FormEvent, useState, useCallback } from "react";
+import { type FormEvent, useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type EditorJS from "@editorjs/editorjs";
-import { ArrowLeft, Loader2, Send } from "lucide-react";
+import { ArrowLeft, Check } from "lucide-react";
 import Link from "next/link";
 
 import { JournalEditor, readEditorContent, type EditorContent } from "@/components/editor";
@@ -20,8 +20,9 @@ export default function NewEntryPage() {
   const [editorInstance, setEditorInstance] = useState<EditorJS | null>(null);
   const [editorReady, setEditorReady] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
 
-  const formatEditorContent = useCallback((content: EditorContent | null) => {
+  const formatEditorContent = (content: EditorContent | null) => {
     if (!content) return "";
 
     const plainBlocks = content.blocks.map((block) => {
@@ -41,7 +42,7 @@ export default function NewEntryPage() {
     });
 
     return plainBlocks.join("\n\n").trim();
-  }, []);
+  };
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -68,8 +69,10 @@ export default function NewEntryPage() {
         throw new Error(details || `Request failed with status ${response.status}`);
       }
 
-      // Navigate back to journal with success
-      router.push("/?submitted=true");
+      setIsSaved(true);
+      setTimeout(() => {
+        router.push("/?submitted=true");
+      }, 500);
     } catch (err) {
       console.error(err);
     } finally {
@@ -82,76 +85,74 @@ export default function NewEntryPage() {
     weekday: "long",
     month: "long",
     day: "numeric",
+    year: "numeric",
   });
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-30 bg-background border-b border-border">
-        <div className="flex h-14 items-center justify-between px-6">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <div>
-              <h1 className="text-base font-semibold text-foreground">New Entry</h1>
-              <p className="text-xs text-muted-foreground">{dateString}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className={`h-2 w-2 rounded-full ${editorReady ? "bg-green-500" : "bg-amber-500 animate-pulse"}`} />
-            <span>{editorReady ? "Ready" : "Loading..."}</span>
-          </div>
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Minimal Header */}
+      <header className="flex-shrink-0 flex items-center justify-between px-6 py-4">
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back</span>
+        </Link>
+
+        <div className="flex items-center gap-3">
+          {editorReady && (
+            <span className="text-xs text-muted-foreground">
+              {isSaved ? "Saved" : "Draft"}
+            </span>
+          )}
         </div>
       </header>
 
-      {/* Main content */}
-      <div className="mx-auto max-w-2xl px-6 py-8">
-        {/* Tappy prompt */}
-        <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-orange-400 to-orange-500 shadow-sm">
-            <span className="text-xl">🦊</span>
-          </div>
-          <p className="text-muted-foreground">What&apos;s on your mind today?</p>
-        </div>
+      {/* Full Page Editor */}
+      <main className="flex-1 flex flex-col">
+        <form onSubmit={onSubmit} className="flex-1 flex flex-col">
+          <div className="flex-1 mx-auto w-full max-w-2xl px-6">
+            {/* Date */}
+            <div className="pt-8 pb-6">
+              <p className="text-sm text-muted-foreground">{dateString}</p>
+            </div>
 
-        {/* Editor */}
-        <form onSubmit={onSubmit}>
-          <div className="editor-container rounded-2xl border border-border bg-card shadow-sm">
-            <JournalEditor
-              onReadyChange={setEditorReady}
-              onInstanceChange={setEditorInstance}
-            />
+            {/* Editor */}
+            <div className="journal-editor-wrapper">
+              <JournalEditor
+                onReadyChange={setEditorReady}
+                onInstanceChange={setEditorInstance}
+              />
+            </div>
           </div>
 
-          {/* Submit button */}
-          <div className="mt-4 flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
-              Tappy will read your entry and suggest helpful actions.
-            </p>
-            <button
-              type="submit"
-              disabled={isSubmitting || !editorReady}
-              className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:bg-primary/90 hover:shadow-md active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Sending...</span>
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4" />
-                  <span>Submit</span>
-                </>
-              )}
-            </button>
+          {/* Bottom Bar */}
+          <div className="flex-shrink-0 border-t border-border bg-background/80 backdrop-blur-sm">
+            <div className="mx-auto max-w-2xl px-6 py-4 flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                Tappy will read your entry and help you take action.
+              </p>
+              <button
+                type="submit"
+                disabled={isSubmitting || !editorReady}
+                className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none"
+              >
+                {isSaved ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    <span>Saved</span>
+                  </>
+                ) : isSubmitting ? (
+                  <span>Saving...</span>
+                ) : (
+                  <span>Save Entry</span>
+                )}
+              </button>
+            </div>
           </div>
         </form>
-      </div>
+      </main>
     </div>
   );
 }

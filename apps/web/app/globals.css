@@ -104,72 +104,100 @@
   }
 }
 
-/* Editor styles - clean and minimal */
-.editor-container .ce-block__content,
-.editor-container .ce-toolbar__content {
-  max-width: 680px;
-  margin: 0 auto;
+/* Journal Editor - Clean, minimal writing experience */
+.codex-editor__redactor {
+  padding-bottom: 200px !important;
 }
 
-.editor-container .codex-editor__redactor {
-  padding-bottom: 120px !important;
+.ce-block__content,
+.ce-toolbar__content {
+  max-width: 100%;
 }
 
-.editor-container .ce-block {
-  @apply transition-colors duration-150;
-}
-
-.editor-container .ce-block:hover {
-  @apply rounded-lg -mx-3 px-3;
-  background-color: hsl(var(--muted) / 0.5);
-}
-
-.editor-container .ce-paragraph {
+.ce-paragraph {
   @apply text-base leading-relaxed;
-  line-height: 1.75;
+  line-height: 1.8;
+  font-size: 16px;
 }
 
-.editor-container .ce-header {
+.ce-header {
   @apply font-semibold tracking-tight;
 }
 
-.editor-container h1.ce-header {
+h1.ce-header {
+  @apply text-3xl mt-8 mb-4;
+}
+
+h2.ce-header {
   @apply text-2xl mt-6 mb-3;
 }
 
-.editor-container h2.ce-header {
+h3.ce-header {
   @apply text-xl mt-5 mb-2;
 }
 
-.editor-container h3.ce-header {
-  @apply text-lg mt-4 mb-2;
+.cdx-list {
+  @apply text-base leading-relaxed pl-6;
+  line-height: 1.8;
 }
 
-.editor-container .cdx-list {
-  @apply text-base leading-relaxed pl-5;
+.cdx-list__item {
+  @apply py-1;
 }
 
-.editor-container .cdx-list__item {
-  @apply py-0.5;
-}
-
-.editor-container .ce-paragraph[data-placeholder]:empty::before {
+.ce-paragraph[data-placeholder]:empty::before,
+.ce-paragraph[data-placeholder-active]:empty::before {
   @apply text-muted-foreground;
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
-.editor-container .ce-toolbar__plus,
-.editor-container .ce-toolbar__settings-btn {
+/* Minimal toolbar styling */
+.ce-toolbar__plus,
+.ce-toolbar__settings-btn {
   @apply bg-background border border-border rounded-lg shadow-sm;
   @apply hover:bg-secondary transition-colors;
+  color: hsl(var(--muted-foreground));
 }
 
-.editor-container .ce-inline-toolbar {
+.ce-toolbar__plus:hover,
+.ce-toolbar__settings-btn:hover {
+  color: hsl(var(--foreground));
+}
+
+.ce-inline-toolbar {
   @apply bg-popover border border-border shadow-lg rounded-xl overflow-hidden;
 }
 
-.editor-container .ce-inline-tool {
+.ce-inline-tool {
   @apply hover:bg-secondary transition-colors;
+}
+
+.ce-inline-tool--active {
+  @apply bg-secondary;
+}
+
+/* Hide toolbar indicators for cleaner look */
+.ce-toolbar__actions {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.ce-block:hover .ce-toolbar__actions,
+.ce-block--focused .ce-toolbar__actions {
+  opacity: 1;
+}
+
+/* Popover menus */
+.ce-popover {
+  @apply bg-popover border border-border shadow-lg rounded-xl overflow-hidden;
+}
+
+.ce-popover-item:hover {
+  @apply bg-secondary;
+}
+
+.ce-popover-item__icon {
+  @apply bg-secondary rounded-lg;
 }
 
 /* Clean scrollbar */
