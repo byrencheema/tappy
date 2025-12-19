@@ -327,22 +327,28 @@ h3.ce-header {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-/* Clean scrollbar */
-.custom-scroll::-webkit-scrollbar {
+/* Clean scrollbar - global */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+
+::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
-.custom-scroll::-webkit-scrollbar-track {
-  @apply bg-transparent;
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.custom-scroll::-webkit-scrollbar-thumb {
-  @apply bg-border rounded-full;
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 3px;
 }
 
-.custom-scroll::-webkit-scrollbar-thumb:hover {
-  @apply bg-muted-foreground/30;
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.3);
 }
 
 /* Subtle animations */

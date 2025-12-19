@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Check, Clock, AlertCircle, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+import { Check, Clock, AlertCircle, Loader2 } from "lucide-react";
+import Image from "next/image";
 import { inboxApi } from "@/lib/api";
 import type { InboxItemResponse, InboxItemStatus } from "@/types/api";
 
-function getStatusStyle(status: InboxItemStatus) {
+function getStatusInfo(status: InboxItemStatus) {
   switch (status) {
     case "needs_confirmation":
       return { icon: AlertCircle, color: "text-amber-500", bg: "bg-amber-500/10" };
@@ -29,11 +30,20 @@ function formatTimestamp(dateString: string) {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+function formatFullDate(dateString: string) {
+  const date = new Date(dateString);
+  return date.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+}
+
 export default function InboxPage() {
   const [items, setItems] = useState<InboxItemResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   useEffect(() => {
     async function loadItems() {
@@ -41,6 +51,9 @@ export default function InboxPage() {
         setIsLoading(true);
         const data = await inboxApi.list();
         setItems(data);
+        if (data.length > 0) {
+          setSelectedId(data[0].id);
+        }
       } catch (err) {
         console.error("Failed to load inbox items:", err);
         setError("Failed to load inbox items");
@@ -54,9 +67,7 @@ export default function InboxPage() {
   const handleConfirm = async (id: number) => {
     try {
       const updated = await inboxApi.update(id, { status: "completed" });
-      setItems((prev) =>
-        prev.map((item) => (item.id === id ? updated : item))
-      );
+      setItems((prev) => prev.map((item) => (item.id === id ? updated : item)));
     } catch (err) {
       console.error("Failed to update item:", err);
     }
@@ -66,18 +77,28 @@ export default function InboxPage() {
     try {
       await inboxApi.delete(id);
       setItems((prev) => prev.filter((item) => item.id !== id));
-      if (expandedId === id) setExpandedId(null);
+      if (selectedId === id) {
+        const currentIndex = items.findIndex((item) => item.id === id);
+        const remaining = items.filter((item) => item.id !== id);
+        if (remaining.length > 0) {
+          const nextIndex = Math.min(currentIndex, remaining.length - 1);
+          setSelectedId(remaining[nextIndex].id);
+        } else {
+          setSelectedId(null);
+        }
+      }
     } catch (err) {
       console.error("Failed to delete item:", err);
     }
   };
 
+  const selectedItem = items.find((item) => item.id === selectedId);
   const needsAttention = items.filter((i) => i.status === "needs_confirmation" || i.status === "pending").length;
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-background border-b border-border">
+      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-sm border-b border-border">
         <div className="flex h-14 items-center justify-between px-6">
           <div className="flex items-center gap-3">
             <h1 className="text-base font-semibold text-foreground">Inbox</h1>
@@ -90,141 +111,164 @@ export default function InboxPage() {
         </div>
       </header>
 
+      {/* Loading */}
+      {isLoading && (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      )}
+
+      {/* Error */}
+      {error && !isLoading && (
+        <div className="text-center py-16">
+          <p className="text-destructive">{error}</p>
+          <button onClick={() => window.location.reload()} className="mt-4 text-sm text-primary hover:underline">
+            Try again
+          </button>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!isLoading && !error && items.length === 0 && (
+        <div className="mx-auto max-w-2xl px-6 py-16">
+          <div className="text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-secondary">
+              <Check className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <h3 className="font-medium text-foreground mb-1">All caught up!</h3>
+            <p className="text-sm text-muted-foreground">I&apos;ll let you know when I find something.</p>
+          </div>
+        </div>
+      )}
+
       {/* Content */}
-      <div className="mx-auto max-w-2xl px-6 py-6">
-        {/* Loading State */}
-        {isLoading && (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        )}
+      {!isLoading && !error && items.length > 0 && (
+        <div className="flex h-[calc(100vh-3.5rem)]">
+          {/* Sidebar */}
+          <aside className="w-72 flex-shrink-0 border-r border-border overflow-y-auto">
+            <div className="p-2">
+              {items.map((item) => {
+                const isSelected = selectedId === item.id;
+                const status = getStatusInfo(item.status);
 
-        {/* Error State */}
-        {error && !isLoading && (
-          <div className="text-center py-16">
-            <p className="text-destructive">{error}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-4 text-sm text-primary hover:underline"
-            >
-              Try again
-            </button>
-          </div>
-        )}
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setSelectedId(item.id)}
+                    className={`w-full text-left rounded-lg p-3 mb-1 transition-colors ${
+                      isSelected ? "bg-secondary" : "hover:bg-secondary/50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-sm font-medium text-foreground truncate ${isSelected ? "font-semibold" : ""}`}>
+                        {item.title}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground ml-2 flex-shrink-0">
+                        {formatTimestamp(item.created_at)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      {item.message.split("\n")[0].replace(/^[•\-\*]\s*/, "")}
+                    </p>
+                    {item.status !== "completed" && (
+                      <div className="mt-2 flex items-center gap-1.5">
+                        <div className={`h-1.5 w-1.5 rounded-full ${status.color.replace("text-", "bg-")}`} />
+                        <span className={`text-[10px] ${status.color}`}>
+                          {item.status === "needs_confirmation" ? "Needs review" : "In progress"}
+                        </span>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
 
-        {/* Content */}
-        {!isLoading && !error && (
-          <>
-            {items.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-secondary">
-                  <Check className="h-6 w-6 text-muted-foreground" />
+          {/* Main Content */}
+          <main className="flex-1 overflow-y-auto">
+            {selectedItem ? (
+              <div className="max-w-2xl mx-auto px-6 py-8">
+                {/* From Tappy */}
+                <div className="flex items-center gap-3 mb-6">
+                  <Image src="/tappy_mascot.png" alt="Tappy" width={40} height={40} className="rounded-full" />
+                  <div>
+                    <p className="font-medium text-foreground">Tappy</p>
+                    <p className="text-xs text-muted-foreground">{formatFullDate(selectedItem.created_at)}</p>
+                  </div>
                 </div>
-                <h3 className="font-medium text-foreground mb-1">All caught up!</h3>
-                <p className="text-sm text-muted-foreground">Tappy will notify you when there&apos;s something new.</p>
+
+                {/* Title */}
+                <h1 className="text-2xl font-semibold text-foreground mb-6">{selectedItem.title}</h1>
+
+                {/* Divider */}
+                <div className="h-px bg-gradient-to-r from-border via-border/50 to-transparent mb-6" />
+
+                {/* Message */}
+                <div className="prose prose-sm max-w-none">
+                  <div className="text-foreground leading-relaxed whitespace-pre-wrap">
+                    {selectedItem.message}
+                  </div>
+                </div>
+
+                {/* Journal Reference */}
+                {selectedItem.journal_excerpt && (
+                  <div className="mt-8 rounded-xl border border-border bg-secondary/30 p-4">
+                    <p className="text-xs text-muted-foreground mb-2">Based on what you wrote:</p>
+                    <p className="text-sm italic text-foreground">&ldquo;{selectedItem.journal_excerpt}&rdquo;</p>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="mt-8 flex items-center gap-3">
+                  {selectedItem.status === "needs_confirmation" && selectedItem.action && (
+                    <>
+                      <button
+                        onClick={() => handleConfirm(selectedItem.id)}
+                        className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                      >
+                        <Check className="h-4 w-4" />
+                        {selectedItem.action}
+                      </button>
+                      <button
+                        onClick={() => handleDismiss(selectedItem.id)}
+                        className="h-9 rounded-lg px-4 text-sm text-muted-foreground hover:bg-secondary transition-colors"
+                      >
+                        Dismiss
+                      </button>
+                    </>
+                  )}
+
+                  {selectedItem.status === "pending" && (
+                    <div className="flex items-center gap-2 text-sm text-blue-500">
+                      <Clock className="h-4 w-4" />
+                      <span>I&apos;m working on this...</span>
+                    </div>
+                  )}
+
+                  {selectedItem.status === "completed" && (
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2 text-sm text-green-500">
+                        <Check className="h-4 w-4" />
+                        <span>Done!</span>
+                      </div>
+                      <button
+                        onClick={() => handleDismiss(selectedItem.id)}
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Remove from inbox
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
-              <div className="space-y-2">
-                {items.map((item) => {
-                  const status = getStatusStyle(item.status);
-                  const StatusIcon = status.icon;
-                  const isExpanded = expandedId === item.id;
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="rounded-xl border border-border bg-card overflow-hidden"
-                    >
-                      {/* Row */}
-                      <button
-                        onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                        className="w-full flex items-center gap-3 p-4 text-left hover:bg-secondary/30 transition-colors"
-                      >
-                        <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${status.bg}`}>
-                          <StatusIcon className={`h-4 w-4 ${status.color}`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-foreground truncate">{item.title}</p>
-                          <p className="text-sm text-muted-foreground truncate">
-                            {item.message.split('\n')[0].replace(/^[•\-\*]\s*/, '')}
-                          </p>
-                        </div>
-                        <span className="text-xs text-muted-foreground flex-shrink-0">
-                          {formatTimestamp(item.created_at)}
-                        </span>
-                        {isExpanded ? (
-                          <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        )}
-                      </button>
-
-                      {/* Expanded Content */}
-                      {isExpanded && (
-                        <div className="px-4 pb-4 pt-0 border-t border-border">
-                          <div className="pt-4 space-y-4">
-                            {/* Message with preserved formatting */}
-                            <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap font-mono bg-secondary/30 rounded-lg p-3">
-                              {item.message}
-                            </div>
-
-                            {item.journal_excerpt && (
-                              <div className="rounded-lg bg-secondary/50 p-3 text-sm">
-                                <p className="text-xs text-muted-foreground mb-1">From your journal</p>
-                                <p className="italic text-foreground">&ldquo;{item.journal_excerpt}&rdquo;</p>
-                              </div>
-                            )}
-
-                            {item.status === "needs_confirmation" && item.action && (
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => handleConfirm(item.id)}
-                                  className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-                                >
-                                  <Check className="h-3.5 w-3.5" />
-                                  {item.action}
-                                </button>
-                                <button
-                                  onClick={() => handleDismiss(item.id)}
-                                  className="h-8 rounded-lg px-3 text-sm text-muted-foreground hover:bg-secondary"
-                                >
-                                  Dismiss
-                                </button>
-                              </div>
-                            )}
-
-                            {item.status === "pending" && (
-                              <div className="flex items-center gap-2 text-sm text-blue-500">
-                                <Clock className="h-4 w-4" />
-                                <span>Working on this...</span>
-                              </div>
-                            )}
-
-                            {item.status === "completed" && (
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 text-sm text-green-500">
-                                  <Check className="h-4 w-4" />
-                                  <span>Completed</span>
-                                </div>
-                                <button
-                                  onClick={() => handleDismiss(item.id)}
-                                  className="text-xs text-muted-foreground hover:text-foreground"
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+              <div className="h-full flex items-center justify-center">
+                <p className="text-sm text-muted-foreground">Select a message</p>
               </div>
             )}
-          </>
-        )}
-      </div>
+          </main>
+        </div>
+      )}
     </div>
   );
 }
