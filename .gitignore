@@ -1,13 +1,36 @@
+# Dependencies
 node_modules
 .bun
 bun.lockb
+
+# Next.js
 .next
+
+# Environment
 .env
 .env.local
 .env.*.local
+
+# Python
 *.pyc
 __pycache__
 .venv
 .uv
 uv.lock
+
+# Database
+*.db
+
+# IDE
+.cursor/
+.idea/
+.vscode/
+
+# Playwright
+.playwright-mcp/
+
+# OS
 .DS_Store
+
+# Scratch
+scratch/

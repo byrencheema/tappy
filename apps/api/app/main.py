@@ -5,7 +5,13 @@ from __future__ import annotations
 import json
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, List, Optional
+
+from dotenv import load_dotenv
+
+# Load .env file from the api directory
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -51,10 +57,17 @@ def _get_allowed_origins() -> List[str]:
 
 
 def _get_genai_client() -> genai.Client:
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=500, detail="GEMINI_API_KEY is not configured")
-    return genai.Client(api_key=api_key)
+    """Get Gemini client via Vertex AI with Application Default Credentials."""
+    project = os.getenv("GOOGLE_CLOUD_PROJECT")
+    location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+
+    if not project:
+        raise HTTPException(
+            status_code=500,
+            detail="GOOGLE_CLOUD_PROJECT is not configured"
+        )
+
+    return genai.Client(vertexai=True, project=project, location=location)
 
 
 def _planner_prompt(text: str) -> str:
@@ -125,7 +138,7 @@ async def _execute_browser_action(action: PlannerAction) -> BrowserUseResult:
 async def _plan_action(text: str) -> PlannerResult:
     client = _get_genai_client()
     response = client.models.generate_content(
-        model=os.getenv("GENAI_MODEL", "gemini-1.5-flash"),
+        model=os.getenv("GENAI_MODEL", "gemini-3.0-flash"),
         contents=[_planner_prompt(text)],
         config=types.GenerateContentConfig(response_mime_type="application/json"),
     )
