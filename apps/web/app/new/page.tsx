@@ -8,7 +8,6 @@ import Link from "next/link";
 
 import { JournalEditor, readEditorContent, type EditorContent } from "@/components/editor";
 import { journalApi } from "@/lib/api";
-import AgenticSteps from "@/components/AgenticSteps";
 import type { JournalCreateResponse } from "@/types/api";
 
 export default function NewEntryPage() {
@@ -93,11 +92,8 @@ export default function NewEntryPage() {
       setResponse(result);
       setIsSaved(true);
 
-      // Redirect after a delay (longer if there are agentic steps to show)
-      const delay = result.agentic_steps && result.agentic_steps.length > 0 ? 2500 : 800;
-      setTimeout(() => {
-        router.push("/");
-      }, delay);
+      // Redirect immediately - processing happens in background
+      router.push("/");
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : "Failed to save entry");
@@ -192,20 +188,6 @@ export default function NewEntryPage() {
           {error && (
             <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 bg-destructive/10 border border-destructive/20 rounded-lg">
               <p className="text-sm text-destructive">{error}</p>
-            </div>
-          )}
-
-          {/* Agentic Steps Display */}
-          {response?.agentic_steps && response.agentic_steps.length > 0 && (
-            <div className="fixed bottom-6 right-6 max-w-md p-4 bg-white border border-gray-200 rounded-lg shadow-lg">
-              <AgenticSteps steps={response.agentic_steps} />
-              {response.inbox_item && (
-                <div className="mt-3 pt-3 border-t border-gray-200">
-                  <p className="text-xs text-gray-500">
-                    ✓ Created inbox item: {response.inbox_item.title}
-                  </p>
-                </div>
-              )}
             </div>
           )}
         </form>

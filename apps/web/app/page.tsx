@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Plus, Search, Loader2, Zap } from "lucide-react";
 import Link from "next/link";
 import { journalApi } from "@/lib/api";
 import type { JournalEntryListItem } from "@/types/api";
+import { Toast } from "@/components/Toast";
 
 function formatRelativeDate(dateString: string): string {
   const date = new Date(dateString);
@@ -28,12 +29,29 @@ export default function JournalPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const previousActionCounts = useRef<Map<number, number>>(new Map());
 
   useEffect(() => {
     async function loadEntries() {
       try {
         setIsLoading(true);
         const data = await journalApi.list();
+
+        // Check for newly completed actions
+        data.forEach((entry) => {
+          const prevCount = previousActionCounts.current.get(entry.id) || 0;
+          const currentCount = entry.actions_triggered;
+
+          // If actions increased, show toast
+          if (currentCount > prevCount && prevCount > 0) {
+            setToastMessage(`Action found from your journal entry!`);
+          }
+
+          // Update the map
+          previousActionCounts.current.set(entry.id, currentCount);
+        });
+
         setEntries(data);
       } catch (err) {
         console.error("Failed to load entries:", err);
@@ -42,7 +60,15 @@ export default function JournalPage() {
         setIsLoading(false);
       }
     }
+
     loadEntries();
+
+    // Poll every 3 seconds to check for processing updates
+    const interval = setInterval(() => {
+      loadEntries();
+    }, 3000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const filteredEntries = searchQuery
@@ -138,6 +164,12 @@ export default function JournalPage() {
                     <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
                       {entry.title || "Untitled"}
                     </p>
+                    {entry.processing_status === "processing" && (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                        Processing
+                      </span>
+                    )}
                     {entry.actions_triggered > 0 && (
                       <span className="inline-flex items-center gap-0.5 text-[10px] text-primary">
                         <Zap className="h-2.5 w-2.5" />
@@ -170,6 +202,15 @@ export default function JournalPage() {
           </div>
         )}
       </div>
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <Toast
+          message={toastMessage}
+          type="success"
+          onClose={() => setToastMessage(null)}
+        />
+      )}
     </div>
   );
 }

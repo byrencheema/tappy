@@ -7,6 +7,7 @@ export type JournalEntryListItem = {
   id: number;
   title: string | null;
   preview: string;
+  processing_status: string;
   created_at: string;
   actions_triggered: number;
 };
@@ -16,6 +17,7 @@ export type JournalEntryResponse = {
   title: string | null;
   text: string;
   content_json: string;
+  processing_status: string;
   created_at: string;
   actions_triggered: number;
 };
@@ -89,7 +91,7 @@ export type AgenticStep = {
 // Combined Response for POST /journal
 export type JournalCreateResponse = {
   entry: JournalEntryResponse;
-  plan: PlannerResult;
+  plan: PlannerResult | null;
   execution: SkillExecutionResult | null;
   inbox_item: InboxItemResponse | null;
   agentic_steps?: AgenticStep[];

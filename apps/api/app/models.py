@@ -20,6 +20,9 @@ class JournalEntry(Base):
     title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)  # Plain text for searching
     content_json: Mapped[str] = mapped_column(Text, nullable=False)  # Full Editor.js JSON
+    processing_status: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="pending"
+    )  # pending, processing, completed, failed
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relationship to inbox items

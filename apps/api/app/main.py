@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import httpx
@@ -312,6 +313,7 @@ async def list_journal_entries(
             id=entry.id,
             title=entry.title,
             preview=_get_preview(entry.text),
+            processing_status=entry.processing_status,
             created_at=entry.created_at,
             actions_triggered=actions_count,
         )
@@ -346,9 +348,96 @@ async def get_journal_entry(
         title=entry.title,
         text=entry.text,
         content_json=entry.content_json,
+        processing_status=entry.processing_status,
         created_at=entry.created_at,
         actions_triggered=actions_count,
     )
+
+
+# =============================================================================
+# BACKGROUND ACTION PROCESSING
+# =============================================================================
+
+async def _process_journal_actions_background(entry_id: int, entry_text: str) -> None:
+    """
+    Process journal actions in the background after entry is saved.
+    This runs asynchronously and updates the entry when complete.
+    """
+    from .database import async_session_maker
+
+    try:
+        async with async_session_maker() as session:
+            # Get the entry and update status to processing
+            entry = await session.get(JournalEntry, entry_id)
+            if not entry:
+                print(f"Entry {entry_id} not found for background processing")
+                return
+
+            entry.processing_status = "processing"
+            await session.commit()
+
+            plan = None
+            execution = None
+            inbox_item_response = None
+
+            # Step 1: Planning
+            try:
+                plan = await _plan_action(entry_text)
+            except Exception as e:
+                print(f"Background planner failed for entry {entry_id}: {e}")
+                plan = PlannerResult(
+                    should_act=False,
+                    skill_id=None,
+                    skill_name=None,
+                    parameters=None,
+                    reason=f"Planner error: {str(e)}"
+                )
+
+            # Step 2: Execute skill if planner says to act
+            if plan and plan.should_act and plan.skill_id and plan.parameters:
+                # Convert SkillParameters to dict for registry
+                params_dict = plan.parameters.model_dump(exclude_none=True) if plan.parameters else {}
+                execution = await _execute_skill(plan.skill_id, params_dict)
+
+                # Step 3: Format results and create inbox item
+                if execution.status == SkillStatus.COMPLETED.value:
+                    registry = get_registry()
+                    handler = registry.get_handler(plan.skill_id)
+
+                    if handler:
+                        formatted = handler.format_result(execution)
+
+                        inbox_item = InboxItem(
+                            journal_entry_id=entry.id,
+                            title=formatted.title[:255],
+                            message=formatted.message,
+                            action=formatted.action,
+                            status=formatted.status,
+                            journal_excerpt=entry_text[:200] if len(entry_text) > 200 else entry_text,
+                        )
+                        session.add(inbox_item)
+                        await session.commit()
+
+                        print(f"Created inbox item for entry {entry_id}: {formatted.title}")
+
+            # Update entry processing status to completed
+            entry = await session.get(JournalEntry, entry_id)
+            if entry:
+                entry.processing_status = "completed"
+                await session.commit()
+                print(f"Background processing completed for entry {entry_id}")
+
+    except Exception as e:
+        print(f"Background processing error for entry {entry_id}: {e}")
+        # Try to mark as failed
+        try:
+            async with async_session_maker() as session:
+                entry = await session.get(JournalEntry, entry_id)
+                if entry:
+                    entry.processing_status = "failed"
+                    await session.commit()
+        except Exception:
+            pass  # Best effort
 
 
 @app.post("/journal", response_model=JournalCreateResponse)
@@ -356,129 +445,46 @@ async def create_journal_entry(
     payload: JournalEntryCreate,
     session: AsyncSession = Depends(get_session),
 ) -> JournalCreateResponse:
-    """Create a new journal entry, analyze it, and optionally execute skills."""
+    """
+    Create a new journal entry and return immediately.
+    Action processing happens in the background.
+    """
     # Use explicit title if provided, otherwise extract from content
     title = payload.title or _extract_title_from_content(payload.content_json)
 
-    # Create the journal entry
+    # Create the journal entry with pending status
     entry = JournalEntry(
         title=title,
         text=payload.text,
         content_json=payload.content_json,
+        processing_status="pending",
     )
     session.add(entry)
     await session.commit()
     await session.refresh(entry)
 
-    # Track agentic workflow steps
-    agentic_steps = []
+    # Start background processing (fire and forget)
+    asyncio.create_task(
+        _process_journal_actions_background(entry.id, payload.text)
+    )
 
-    # Step 1: Planning
-    plan = None
-    execution = None
-    inbox_item_response = None
-
-    agentic_steps.append(AgenticStep(
-        type="planning",
-        status="running",
-        title="Analyzing journal entry",
-        message="Determining if any actions should be taken..."
-    ))
-
-    try:
-        plan = await _plan_action(payload.text)
-        agentic_steps[-1].status = "completed"
-        agentic_steps[-1].message = plan.reason
-    except Exception as e:
-        print(f"Planner failed (entry still saved): {e}")
-        plan = PlannerResult(
-            should_act=False,
-            skill_id=None,
-            skill_name=None,
-            parameters=None,
-            reason=f"Planner error: {str(e)}"
-        )
-        agentic_steps[-1].status = "failed"
-        agentic_steps[-1].message = f"Planning failed: {str(e)}"
-
-    # Execute skill if planner says to act
-    if plan.should_act and plan.skill_id and plan.parameters:
-        # Step 2: Execution
-        agentic_steps.append(AgenticStep(
-            type="execution",
-            status="running",
-            title=f"Executing {plan.skill_name or 'skill'}",
-            message=f"Running skill with parameters..."
-        ))
-
-        # Convert SkillParameters to dict for registry
-        params_dict = plan.parameters.model_dump(exclude_none=True) if plan.parameters else {}
-        execution = await _execute_skill(plan.skill_id, params_dict)
-
-        if execution.status == SkillStatus.COMPLETED.value:
-            agentic_steps[-1].status = "completed"
-            agentic_steps[-1].message = "Skill executed successfully"
-        else:
-            agentic_steps[-1].status = "failed"
-            agentic_steps[-1].message = execution.error or "Execution failed"
-
-        # Step 3: Formatting
-        agentic_steps.append(AgenticStep(
-            type="formatting",
-            status="running",
-            title="Formatting results",
-            message="Preparing inbox item..."
-        ))
-
-        # Format results using registry handler
-        registry = get_registry()
-        handler = registry.get_handler(plan.skill_id)
-
-        if handler:
-            formatted = handler.format_result(execution)
-
-            inbox_item = InboxItem(
-                journal_entry_id=entry.id,
-                title=formatted.title[:255],
-                message=formatted.message,
-                action=formatted.action,
-                status=formatted.status,
-                journal_excerpt=payload.text[:200] if len(payload.text) > 200 else payload.text,
-            )
-            session.add(inbox_item)
-            await session.commit()
-            await session.refresh(inbox_item)
-
-            inbox_item_response = InboxItemResponse(
-                id=inbox_item.id,
-                title=inbox_item.title,
-                message=inbox_item.message,
-                action=inbox_item.action,
-                status=inbox_item.status,
-                journal_entry_id=inbox_item.journal_entry_id,
-                journal_excerpt=inbox_item.journal_excerpt,
-                created_at=inbox_item.created_at,
-                skill_result=execution.output if execution.status == SkillStatus.COMPLETED.value else None,
-            )
-
-            agentic_steps[-1].status = "completed"
-            agentic_steps[-1].message = "Created inbox item"
-
+    # Return immediately - processing happens in background
     entry_response = JournalEntryResponse(
         id=entry.id,
         title=entry.title,
         text=entry.text,
         content_json=entry.content_json,
+        processing_status=entry.processing_status,
         created_at=entry.created_at,
-        actions_triggered=1 if inbox_item_response else 0,
+        actions_triggered=0,  # Will be updated by background task
     )
 
     return JournalCreateResponse(
         entry=entry_response,
-        plan=plan,
-        execution=execution,
-        inbox_item=inbox_item_response,
-        agentic_steps=agentic_steps,
+        plan=None,  # Will be processed in background
+        execution=None,
+        inbox_item=None,
+        agentic_steps=[],  # No steps to show - happens in background
     )
 
 

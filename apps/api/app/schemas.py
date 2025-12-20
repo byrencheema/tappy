@@ -22,6 +22,7 @@ class JournalEntryResponse(BaseModel):
     title: Optional[str] = None
     text: str
     content_json: str
+    processing_status: str = Field(default="pending", description="Status of background action processing")
     created_at: datetime
     actions_triggered: int = Field(default=0, description="Number of inbox items created from this entry")
 
@@ -34,6 +35,7 @@ class JournalEntryListItem(BaseModel):
     id: int
     title: Optional[str] = None
     preview: str = Field(..., description="First ~150 chars of the text")
+    processing_status: str = Field(default="pending", description="Status of background action processing")
     created_at: datetime
     actions_triggered: int = 0
 
@@ -120,7 +122,7 @@ class AgenticStep(BaseModel):
 class JournalCreateResponse(BaseModel):
     """Response schema for creating a journal entry with analysis."""
     entry: JournalEntryResponse
-    plan: PlannerResult
+    plan: Optional[PlannerResult] = None
     execution: Optional[SkillExecutionResult] = None
     inbox_item: Optional[InboxItemResponse] = None
     agentic_steps: List[AgenticStep] = Field(default_factory=list, description="Step-by-step progress")
