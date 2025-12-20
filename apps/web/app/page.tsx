@@ -1,51 +1,26 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Search, Loader2 } from "lucide-react";
+import { Plus, Search, Loader2, Zap } from "lucide-react";
 import Link from "next/link";
 import { journalApi } from "@/lib/api";
 import type { JournalEntryListItem } from "@/types/api";
 
-function formatTime(dateString: string) {
+function formatRelativeDate(dateString: string): string {
   const date = new Date(dateString);
-  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-}
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
 
-function getTimeGroup(dateString: string): string {
-  const date = new Date(dateString);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays}d ago`;
 
-  const oneWeekAgo = new Date(today);
-  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-
-  if (date.toDateString() === today.toDateString()) {
-    return "Today";
-  }
-  if (date.toDateString() === yesterday.toDateString()) {
-    return "Yesterday";
-  }
-  if (date > oneWeekAgo) {
-    return "Last week";
-  }
-  return "Older";
-}
-
-function groupEntriesByTime(entries: JournalEntryListItem[]): Record<string, JournalEntryListItem[]> {
-  const groups: Record<string, JournalEntryListItem[]> = {
-    "Today": [],
-    "Yesterday": [],
-    "Last week": [],
-    "Older": []
-  };
-
-  entries.forEach(entry => {
-    const group = getTimeGroup(entry.created_at);
-    groups[group].push(entry);
-  });
-
-  return groups;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 export default function JournalPage() {
@@ -76,147 +51,123 @@ export default function JournalPage() {
           e.preview.toLowerCase().includes(searchQuery.toLowerCase()) ||
           e.title?.toLowerCase().includes(searchQuery.toLowerCase())
       )
-    : null;
-
-  const groupedEntries = !searchQuery ? groupEntriesByTime(entries) : null;
+    : entries;
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Notion-like Header */}
-      <header className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border">
-        <div className="mx-auto max-w-5xl px-8 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-semibold text-foreground">Journal</h1>
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="Search"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-9 w-64 rounded-md border border-border/50 bg-background pl-9 pr-4 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-border focus:ring-1 focus:ring-border"
-                />
-              </div>
-              <Link
-                href="/new"
-                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-                New
-              </Link>
-            </div>
+      <div className="mx-auto max-w-xl px-4 py-8">
+        {/* Write CTA */}
+        <Link
+          href="/new"
+          className="group mb-8 flex items-center gap-3 rounded-xl border border-border/60 bg-secondary/30 px-4 py-3 transition hover:border-border hover:bg-secondary/50"
+        >
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
+            <Plus className="h-4 w-4" />
           </div>
-        </div>
-      </header>
+          <span className="text-sm text-muted-foreground group-hover:text-foreground transition">
+            Write something...
+          </span>
+        </Link>
 
-      <div className="mx-auto max-w-5xl px-8 py-8">
-        {/* Loading State */}
+        {/* Search */}
+        <div className="relative mb-6">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
+          <input
+            type="text"
+            placeholder="Search entries"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-9 w-full rounded-lg border-0 bg-secondary/50 pl-9 pr-4 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
+          />
+        </div>
+
+        {/* Loading */}
         {isLoading && (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         )}
 
-        {/* Error State */}
+        {/* Error */}
         {error && !isLoading && (
-          <div className="text-center py-16">
-            <p className="text-destructive">{error}</p>
+          <div className="text-center py-12">
+            <p className="text-sm text-destructive">{error}</p>
             <button
               onClick={() => window.location.reload()}
-              className="mt-4 text-sm text-primary hover:underline"
+              className="mt-3 text-sm text-primary hover:underline"
             >
               Try again
             </button>
           </div>
         )}
 
-        {/* Search Results */}
-        {!isLoading && !error && filteredEntries && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                {filteredEntries.length} result{filteredEntries.length !== 1 ? "s" : ""}
-              </p>
-              <button
-                onClick={() => setSearchQuery("")}
-                className="text-sm text-muted-foreground hover:text-foreground"
-              >
-                Clear
-              </button>
-            </div>
-            <div className="space-y-1">
-              {filteredEntries.map((entry) => (
-                <Link
-                  key={entry.id}
-                  href={`/entry/${entry.id}`}
-                  className="group flex flex-col py-3 px-2 rounded-md hover:bg-secondary/50 transition-colors"
-                >
-                  <div className="flex items-baseline gap-2">
-                    <p className="font-medium text-foreground group-hover:text-primary transition-colors">
-                      {entry.title || "Untitled"}
-                    </p>
-                    <span className="text-xs text-muted-foreground/70">{formatTime(entry.created_at)}</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground line-clamp-2 mt-0.5">
-                    {entry.preview}
-                  </p>
-                </Link>
-              ))}
-            </div>
+        {/* Empty State */}
+        {!isLoading && !error && entries.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-sm text-muted-foreground">No entries yet</p>
+            <p className="text-xs text-muted-foreground/60 mt-1">
+              Start writing to capture your thoughts
+            </p>
           </div>
         )}
 
-        {/* Chronologically Grouped Entries */}
-        {!isLoading && !error && !filteredEntries && groupedEntries && (
-          <>
-            {entries.length === 0 ? (
-              <div className="text-center py-20">
-                <p className="text-muted-foreground mb-4">No entries yet</p>
-                <Link
-                  href="/new"
-                  className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+        {/* Entries */}
+        {!isLoading && !error && filteredEntries.length > 0 && (
+          <div className="space-y-1">
+            {searchQuery && (
+              <div className="flex items-center justify-between mb-3 px-1">
+                <p className="text-xs text-muted-foreground">
+                  {filteredEntries.length} result{filteredEntries.length !== 1 ? "s" : ""}
+                </p>
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="text-xs text-muted-foreground hover:text-foreground"
                 >
-                  <Plus className="h-4 w-4" />
-                  Create your first entry
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-8">
-                {(["Today", "Yesterday", "Last week", "Older"] as const).map((groupName) => {
-                  const groupEntries = groupedEntries[groupName];
-                  if (groupEntries.length === 0) return null;
-
-                  return (
-                    <div key={groupName} className="space-y-1">
-                      <h2 className="text-sm font-medium text-muted-foreground mb-3">
-                        {groupName}
-                      </h2>
-                      <div className="space-y-1">
-                        {groupEntries.map((entry) => (
-                          <Link
-                            key={entry.id}
-                            href={`/entry/${entry.id}`}
-                            className="group flex flex-col py-3 px-2 -mx-2 rounded-md hover:bg-secondary/50 transition-colors"
-                          >
-                            <div className="flex items-baseline gap-2">
-                              <p className="font-medium text-foreground group-hover:text-primary transition-colors">
-                                {entry.title || "Untitled"}
-                              </p>
-                              <span className="text-xs text-muted-foreground/70">{formatTime(entry.created_at)}</span>
-                            </div>
-                            <p className="text-sm text-muted-foreground line-clamp-2 mt-0.5">
-                              {entry.preview}
-                            </p>
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
+                  Clear
+                </button>
               </div>
             )}
-          </>
+            {filteredEntries.map((entry) => (
+              <Link
+                key={entry.id}
+                href={`/entry/${entry.id}`}
+                className="group flex items-center gap-3 rounded-lg px-3 py-2 transition hover:bg-secondary/50"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                      {entry.title || "Untitled"}
+                    </p>
+                    {entry.actions_triggered > 0 && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] text-primary">
+                        <Zap className="h-2.5 w-2.5" />
+                        {entry.actions_triggered}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    {entry.preview}
+                  </p>
+                </div>
+                <span className="text-[10px] text-muted-foreground/60 flex-shrink-0">
+                  {formatRelativeDate(entry.created_at)}
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {/* No search results */}
+        {!isLoading && !error && searchQuery && filteredEntries.length === 0 && entries.length > 0 && (
+          <div className="text-center py-12">
+            <p className="text-sm text-muted-foreground">No entries found</p>
+            <button
+              onClick={() => setSearchQuery("")}
+              className="mt-2 text-xs text-primary hover:underline"
+            >
+              Clear search
+            </button>
+          </div>
         )}
       </div>
     </div>

@@ -67,6 +67,24 @@ class ResearchParameters(BaseSkillParameters):
     depth: str = Field(default="medium", description="Research depth: quick, medium, or deep")
 
 
+class HackerNewsParameters(BaseSkillParameters):
+    """Parameters for HackerNews top posts skill."""
+    limit: int = Field(default=10, ge=1, le=30, description="Number of top posts to fetch")
+
+
+class WeatherParameters(BaseSkillParameters):
+    """Parameters for weather forecast skill."""
+    location: str = Field(..., description="City or location for weather forecast")
+    days: int = Field(default=7, ge=1, le=7, description="Number of days to forecast")
+    units: str = Field(default="e", description="Temperature units: 'e' for Fahrenheit, 'm' for Celsius")
+
+
+class NewsSearchParameters(BaseSkillParameters):
+    """Parameters for news search skill."""
+    query: str = Field(..., description="Search query for news articles")
+    max_results: int = Field(default=10, ge=1, le=20, description="Max articles to return")
+
+
 # Note: SkillExecutionResult is imported from schemas.py to avoid duplication
 
 

@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Job Search Entry",
+    "text": "I'm looking for ML engineer positions in San Francisco. Need to find some good opportunities that pay well.",
+    "content_json": "{\"blocks\": [{\"type\": \"paragraph\", \"data\": {\"text\": \"I'm looking for ML engineer positions in San Francisco. Need to find some good opportunities that pay well.\"}}]}",
+    "expected_skill": "Tech Job Search"
+  },
+  {
+    "name": "HackerNews Entry",
+    "text": "Want to see what's trending on HackerNews today. Always good to stay up to date with tech news.",
+    "content_json": "{\"blocks\": [{\"type\": \"paragraph\", \"data\": {\"text\": \"Want to see what's trending on HackerNews today. Always good to stay up to date with tech news.\"}}]}",
+    "expected_skill": "HackerNews Top Posts"
+  },
+  {
+    "name": "Weather Entry",
+    "text": "Planning a trip to Tokyo next week. What's the weather going to be like?",
+    "content_json": "{\"blocks\": [{\"type\": \"paragraph\", \"data\": {\"text\": \"Planning a trip to Tokyo next week. What's the weather going to be like?\"}}]}",
+    "expected_skill": "Weather Forecast"
+  },
+  {
+    "name": "News Entry",
+    "text": "I want to read about the latest AI developments. What's happening in the AI world?",
+    "content_json": "{\"blocks\": [{\"type\": \"paragraph\", \"data\": {\"text\": \"I want to read about the latest AI developments. What's happening in the AI world?\"}}]}",
+    "expected_skill": "News Search"
+  },
+  {
+    "name": "No Action Entry",
+    "text": "Had a great day today. Went for a walk and enjoyed the sunshine.",
+    "content_json": "{\"blocks\": [{\"type\": \"paragraph\", \"data\": {\"text\": \"Had a great day today. Went for a walk and enjoyed the sunshine.\"}}]}",
+    "expected_skill": null
+  }
+]
