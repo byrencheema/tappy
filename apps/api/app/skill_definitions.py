@@ -106,7 +106,8 @@ job_search_config = SkillConfig(
     planner_hints=(
         "Use when user mentions: job search, finding jobs, career opportunities, "
         "hiring, positions, roles, employment. Extract keywords, company names "
-        "(prefix with @company:), and locations (prefix with @location:)."
+        "(prefix with @company:), and locations (prefix with @location:). "
+        "Expand location abbreviations (SF→San Francisco, NYC→New York City, etc.)."
     )
 )
 
@@ -214,7 +215,8 @@ def format_hackernews_result(result: SkillExecutionResult) -> FormattedSkillResu
             )
 
         # Parse response - handle different structures
-        data = output.get("result", {})
+        result_data = output.get("result", {})
+        data = result_data.get("data", {})
         posts = data.get("posts", [])
 
         if not posts:
@@ -358,7 +360,9 @@ weather_config = SkillConfig(
     example_params={"location": "San Francisco", "days": 3, "units": "e"},
     planner_hints=(
         "Use when user mentions: weather, forecast, temperature, rain, snow, "
-        "planning trips, what to wear, outdoor activities."
+        "planning trips, what to wear, outdoor activities. "
+        "IMPORTANT: Extract and expand location abbreviations (SF→San Francisco, NYC→New York City, etc.) "
+        "to full city names for accurate weather lookups."
     )
 )
 
