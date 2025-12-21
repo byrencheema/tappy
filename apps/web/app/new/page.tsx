@@ -3,23 +3,18 @@
 import { type FormEvent, useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type EditorJS from "@editorjs/editorjs";
-import { ArrowLeft, Check, Calendar } from "lucide-react";
+import { ArrowLeft, Calendar } from "lucide-react";
 import Link from "next/link";
 
 import { JournalEditor, readEditorContent, type EditorContent } from "@/components/editor";
 import { journalApi } from "@/lib/api";
-import AgenticSteps from "@/components/AgenticSteps";
-import type { JournalCreateResponse } from "@/types/api";
 
 export default function NewEntryPage() {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [editorInstance, setEditorInstance] = useState<EditorJS | null>(null);
   const [editorReady, setEditorReady] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [response, setResponse] = useState<JournalCreateResponse | null>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-resize title textarea
@@ -72,7 +67,6 @@ export default function NewEntryPage() {
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setIsSubmitting(true);
     setError(null);
 
     try {
@@ -83,26 +77,31 @@ export default function NewEntryPage() {
         throw new Error("Please write something before saving.");
       }
 
-      // Send title, plain text, and full Editor.js JSON
-      const result = await journalApi.create({
-        title: title.trim() || undefined,
-        text: text || title.trim(),
+      const entryTitle = title.trim() || null;
+      const entryText = text || title.trim();
+
+      // Store optimistic entry for home page to show immediately
+      const optimisticEntry = {
+        id: -Date.now(), // Temporary negative ID
+        title: entryTitle,
+        preview: entryText.slice(0, 150),
+        created_at: new Date().toISOString(),
+        actions_triggered: 0,
+      };
+      sessionStorage.setItem("optimisticEntry", JSON.stringify(optimisticEntry));
+
+      // Fire and forget - save in background
+      journalApi.create({
+        title: entryTitle || undefined,
+        text: entryText,
         content_json: JSON.stringify(content),
-      });
+      }).catch(err => console.error("Save failed:", err));
 
-      setResponse(result);
-      setIsSaved(true);
-
-      // Redirect after a delay (longer if there are agentic steps to show)
-      const delay = result.agentic_steps && result.agentic_steps.length > 0 ? 2500 : 800;
-      setTimeout(() => {
-        router.push("/");
-      }, delay);
+      // Navigate immediately
+      router.push("/");
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : "Failed to save entry");
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -126,30 +125,14 @@ export default function NewEntryPage() {
           <span>Back</span>
         </Link>
 
-        <div className="flex items-center gap-4">
-          {editorReady && (
-            <span className="text-xs text-muted-foreground px-2 py-1 rounded-md bg-secondary/50">
-              {isSaved ? "✓ Saved" : "Draft"}
-            </span>
-          )}
-          <button
-            type="submit"
-            form="journal-form"
-            disabled={isSubmitting || !editorReady}
-            className="inline-flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none"
-          >
-            {isSaved ? (
-              <>
-                <Check className="h-3.5 w-3.5" />
-                <span>Saved</span>
-              </>
-            ) : isSubmitting ? (
-              <span>Saving...</span>
-            ) : (
-              <span>Save</span>
-            )}
-          </button>
-        </div>
+        <button
+          type="submit"
+          form="journal-form"
+          disabled={!editorReady}
+          className="inline-flex h-8 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none"
+        >
+          Save
+        </button>
       </header>
 
       {/* Main Editor Area */}
@@ -192,20 +175,6 @@ export default function NewEntryPage() {
           {error && (
             <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 bg-destructive/10 border border-destructive/20 rounded-lg">
               <p className="text-sm text-destructive">{error}</p>
-            </div>
-          )}
-
-          {/* Agentic Steps Display */}
-          {response?.agentic_steps && response.agentic_steps.length > 0 && (
-            <div className="fixed bottom-6 right-6 max-w-md p-4 bg-white border border-gray-200 rounded-lg shadow-lg">
-              <AgenticSteps steps={response.agentic_steps} />
-              {response.inbox_item && (
-                <div className="mt-3 pt-3 border-t border-gray-200">
-                  <p className="text-xs text-gray-500">
-                    ✓ Created inbox item: {response.inbox_item.title}
-                  </p>
-                </div>
-              )}
             </div>
           )}
         </form>

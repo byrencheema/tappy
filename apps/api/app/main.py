@@ -14,24 +14,22 @@ from dotenv import load_dotenv
 # Load .env file from the api directory
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .database import init_db, get_session
+from .database import init_db, get_session, async_session_maker
 from .models import JournalEntry, InboxItem
 from .schemas import (
     JournalEntryCreate,
     JournalEntryResponse,
     JournalEntryListItem,
-    JournalCreateResponse,
     InboxItemUpdate,
     InboxItemResponse,
     PlannerResult,
     SkillParameters,
     SkillExecutionResult,
-    AgenticStep,
 )
 from .skills import get_registry, SkillStatus
 from . import skill_definitions  # Auto-registers skills
@@ -242,6 +240,55 @@ async def _execute_skill(skill_id: str, parameters: dict) -> SkillExecutionResul
 
 
 # =============================================================================
+# BACKGROUND PROCESSING - Tappy discovers things async
+# =============================================================================
+
+async def _process_entry_background(entry_id: int, text: str) -> None:
+    """
+    Background task: Analyze entry and create inbox items.
+    Runs after save returns, so user isn't blocked.
+    """
+    async with async_session_maker() as session:
+        try:
+            # Run planner
+            plan = await _plan_action(text)
+
+            if not plan.should_act or not plan.skill_id or not plan.parameters:
+                print(f"[Background] Entry {entry_id}: No action needed - {plan.reason}")
+                return
+
+            # Execute skill
+            params_dict = plan.parameters.model_dump(exclude_none=True)
+            print(f"[Background] Entry {entry_id}: Executing {plan.skill_name}")
+            execution = await _execute_skill(plan.skill_id, params_dict)
+
+            if execution.status != SkillStatus.COMPLETED.value:
+                print(f"[Background] Entry {entry_id}: Skill failed - {execution.error}")
+                return
+
+            # Format and save inbox item
+            registry = get_registry()
+            handler = registry.get_handler(plan.skill_id)
+
+            if handler:
+                formatted = handler.format_result(execution)
+                inbox_item = InboxItem(
+                    journal_entry_id=entry_id,
+                    title=formatted.title[:255],
+                    message=formatted.message,
+                    action=formatted.action,
+                    status=formatted.status,
+                    journal_excerpt=text[:200] if len(text) > 200 else text,
+                )
+                session.add(inbox_item)
+                await session.commit()
+                print(f"[Background] Entry {entry_id}: Created inbox item '{formatted.title}'")
+
+        except Exception as e:
+            print(f"[Background] Entry {entry_id}: Error - {e}")
+
+
+# =============================================================================
 # HELPERS
 # =============================================================================
 
@@ -351,12 +398,13 @@ async def get_journal_entry(
     )
 
 
-@app.post("/journal", response_model=JournalCreateResponse)
+@app.post("/journal", response_model=JournalEntryResponse)
 async def create_journal_entry(
     payload: JournalEntryCreate,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-) -> JournalCreateResponse:
-    """Create a new journal entry, analyze it, and optionally execute skills."""
+) -> JournalEntryResponse:
+    """Create a new journal entry. Returns instantly, Tappy processes in background."""
     # Use explicit title if provided, otherwise extract from content
     title = payload.title or _extract_title_from_content(payload.content_json)
 
@@ -370,115 +418,16 @@ async def create_journal_entry(
     await session.commit()
     await session.refresh(entry)
 
-    # Track agentic workflow steps
-    agentic_steps = []
+    # Fire off background processing - Tappy will discover things async
+    background_tasks.add_task(_process_entry_background, entry.id, payload.text)
 
-    # Step 1: Planning
-    plan = None
-    execution = None
-    inbox_item_response = None
-
-    agentic_steps.append(AgenticStep(
-        type="planning",
-        status="running",
-        title="Analyzing journal entry",
-        message="Determining if any actions should be taken..."
-    ))
-
-    try:
-        plan = await _plan_action(payload.text)
-        agentic_steps[-1].status = "completed"
-        agentic_steps[-1].message = plan.reason
-    except Exception as e:
-        print(f"Planner failed (entry still saved): {e}")
-        plan = PlannerResult(
-            should_act=False,
-            skill_id=None,
-            skill_name=None,
-            parameters=None,
-            reason=f"Planner error: {str(e)}"
-        )
-        agentic_steps[-1].status = "failed"
-        agentic_steps[-1].message = f"Planning failed: {str(e)}"
-
-    # Execute skill if planner says to act
-    if plan.should_act and plan.skill_id and plan.parameters:
-        # Step 2: Execution
-        agentic_steps.append(AgenticStep(
-            type="execution",
-            status="running",
-            title=f"Executing {plan.skill_name or 'skill'}",
-            message=f"Running skill with parameters..."
-        ))
-
-        # Convert SkillParameters to dict for registry
-        params_dict = plan.parameters.model_dump(exclude_none=True) if plan.parameters else {}
-        execution = await _execute_skill(plan.skill_id, params_dict)
-
-        if execution.status == SkillStatus.COMPLETED.value:
-            agentic_steps[-1].status = "completed"
-            agentic_steps[-1].message = "Skill executed successfully"
-        else:
-            agentic_steps[-1].status = "failed"
-            agentic_steps[-1].message = execution.error or "Execution failed"
-
-        # Step 3: Formatting
-        agentic_steps.append(AgenticStep(
-            type="formatting",
-            status="running",
-            title="Formatting results",
-            message="Preparing inbox item..."
-        ))
-
-        # Format results using registry handler
-        registry = get_registry()
-        handler = registry.get_handler(plan.skill_id)
-
-        if handler:
-            formatted = handler.format_result(execution)
-
-            inbox_item = InboxItem(
-                journal_entry_id=entry.id,
-                title=formatted.title[:255],
-                message=formatted.message,
-                action=formatted.action,
-                status=formatted.status,
-                journal_excerpt=payload.text[:200] if len(payload.text) > 200 else payload.text,
-            )
-            session.add(inbox_item)
-            await session.commit()
-            await session.refresh(inbox_item)
-
-            inbox_item_response = InboxItemResponse(
-                id=inbox_item.id,
-                title=inbox_item.title,
-                message=inbox_item.message,
-                action=inbox_item.action,
-                status=inbox_item.status,
-                journal_entry_id=inbox_item.journal_entry_id,
-                journal_excerpt=inbox_item.journal_excerpt,
-                created_at=inbox_item.created_at,
-                skill_result=execution.output if execution.status == SkillStatus.COMPLETED.value else None,
-            )
-
-            agentic_steps[-1].status = "completed"
-            agentic_steps[-1].message = "Created inbox item"
-
-    entry_response = JournalEntryResponse(
+    return JournalEntryResponse(
         id=entry.id,
         title=entry.title,
         text=entry.text,
         content_json=entry.content_json,
         created_at=entry.created_at,
-        actions_triggered=1 if inbox_item_response else 0,
-    )
-
-    return JournalCreateResponse(
-        entry=entry_response,
-        plan=plan,
-        execution=execution,
-        inbox_item=inbox_item_response,
-        agentic_steps=agentic_steps,
+        actions_triggered=0,  # Will be updated when background task completes
     )
 
 

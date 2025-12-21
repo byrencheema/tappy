@@ -6,7 +6,6 @@ import type {
   JournalEntryListItem,
   JournalEntryResponse,
   JournalEntryCreate,
-  JournalCreateResponse,
   InboxItemResponse,
   InboxItemUpdate,
 } from "@/types/api";
@@ -40,7 +39,7 @@ export const journalApi = {
     return handleResponse(response);
   },
 
-  async create(data: JournalEntryCreate): Promise<JournalCreateResponse> {
+  async create(data: JournalEntryCreate): Promise<JournalEntryResponse> {
     const response = await fetch(`${API_BASE}/journal`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -107,20 +107,3 @@ class SkillExecutionResult(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
-class AgenticStep(BaseModel):
-    """A single step in the agentic workflow for frontend display."""
-    type: str = Field(..., description="Step type: planning, execution, formatting")
-    status: str = Field(..., description="Status: pending, running, completed, failed")
-    title: str = Field(..., description="Human-readable step title")
-    message: Optional[str] = Field(None, description="Details about this step")
-    timestamp: datetime = Field(default_factory=datetime.now)
-
-
-# Combined Journal Response (for POST /journal)
-class JournalCreateResponse(BaseModel):
-    """Response schema for creating a journal entry with analysis."""
-    entry: JournalEntryResponse
-    plan: PlannerResult
-    execution: Optional[SkillExecutionResult] = None
-    inbox_item: Optional[InboxItemResponse] = None
-    agentic_steps: List[AgenticStep] = Field(default_factory=list, description="Step-by-step progress")
