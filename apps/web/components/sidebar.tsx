@@ -37,10 +37,7 @@ export function Sidebar() {
           <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl">
             <Image src="/tappy_mascot.png" alt="Tappy" width={40} height={40} className="object-cover" />
           </div>
-          <div>
-            <h1 className="text-base font-semibold text-sidebar-foreground">Tappy</h1>
-            <p className="text-xs text-muted-foreground">Your life assistant</p>
-          </div>
+          <h1 className="text-base font-semibold text-sidebar-foreground">Tappy</h1>
         </div>
 
         {/* Navigation */}
