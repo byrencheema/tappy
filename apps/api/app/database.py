@@ -33,3 +33,8 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """Dependency for getting database sessions."""
     async with async_session_maker() as session:
         yield session
+
+
+def get_async_session_maker():
+    """Get the async session maker for background tasks."""
+    return async_session_maker

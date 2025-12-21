@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Check, Clock, AlertCircle, Loader2, ArrowUpRight, Filter } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Check, Clock, AlertCircle, Loader2, ArrowUpRight, Filter, Sparkles } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { inboxApi } from "@/lib/api";
@@ -47,6 +47,9 @@ export default function InboxPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<InboxItemStatus | "all">("all");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [newItemsNotification, setNewItemsNotification] = useState<InboxItemResponse[]>([]);
+  const lastCheckTimeRef = useRef<string>(new Date().toISOString());
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     async function loadItems() {
@@ -54,6 +57,7 @@ export default function InboxPage() {
         setIsLoading(true);
         const data = await inboxApi.list();
         setItems(data);
+        lastCheckTimeRef.current = new Date().toISOString();
       } catch (err) {
         console.error("Failed to load inbox items:", err);
         setError("Failed to load inbox items");
@@ -63,6 +67,50 @@ export default function InboxPage() {
     }
     loadItems();
   }, []);
+
+  // Polling for new inbox items
+  useEffect(() => {
+    if (isLoading || error) return;
+
+    const poll = async () => {
+      try {
+        const recentItems = await inboxApi.getRecent(lastCheckTimeRef.current);
+
+        if (recentItems.length > 0) {
+          // Add new items to the list
+          setItems((prev) => {
+            const existingIds = new Set(prev.map(item => item.id));
+            const newItems = recentItems.filter(item => !existingIds.has(item.id));
+
+            if (newItems.length > 0) {
+              // Show notification for new items
+              setNewItemsNotification(newItems);
+              // Auto-hide notification after 5 seconds
+              setTimeout(() => setNewItemsNotification([]), 5000);
+
+              return [...newItems, ...prev];
+            }
+            return prev;
+          });
+
+          // Update last check time to most recent item
+          lastCheckTimeRef.current = new Date().toISOString();
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+    };
+
+    // Poll every 3 seconds
+    pollIntervalRef.current = setInterval(poll, 3000);
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, [isLoading, error]);
 
   const filteredItems = items.filter((item) =>
     statusFilter === "all" ? true : item.status === statusFilter
@@ -334,6 +382,28 @@ export default function InboxPage() {
               </div>
             )}
           </main>
+          </div>
+        </div>
+      )}
+
+      {/* New Items Notification Toast */}
+      {newItemsNotification.length > 0 && (
+        <div className="fixed bottom-6 right-6 max-w-md p-4 bg-white border border-green-200 rounded-lg shadow-lg animate-in slide-in-from-bottom z-50">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 mt-0.5">
+              <Sparkles className="h-5 w-5 text-green-600" />
+            </div>
+            <div className="flex-1">
+              <h4 className="text-sm font-semibold text-gray-900 mb-1">
+                {newItemsNotification.length === 1 ? "New Action Created!" : `${newItemsNotification.length} New Actions Created!`}
+              </h4>
+              {newItemsNotification.slice(0, 2).map((item) => (
+                <p key={item.id} className="text-sm text-gray-700 mb-1">{item.title}</p>
+              ))}
+              {newItemsNotification.length > 2 && (
+                <p className="text-xs text-gray-500 mt-1">And {newItemsNotification.length - 2} more...</p>
+              )}
+            </div>
           </div>
         </div>
       )}

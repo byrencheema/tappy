@@ -40,7 +40,7 @@ export const journalApi = {
     return handleResponse(response);
   },
 
-  async create(data: JournalEntryCreate): Promise<JournalCreateResponse> {
+  async create(data: JournalEntryCreate): Promise<JournalEntryResponse> {
     const response = await fetch(`${API_BASE}/journal`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -85,6 +85,14 @@ export const inboxApi = {
       const text = await response.text();
       throw new ApiError(response.status, text);
     }
+  },
+
+  async getRecent(since?: string): Promise<InboxItemResponse[]> {
+    const url = since
+      ? `${API_BASE}/inbox/recent?since=${encodeURIComponent(since)}`
+      : `${API_BASE}/inbox/recent`;
+    const response = await fetch(url);
+    return handleResponse(response);
   },
 };
 
