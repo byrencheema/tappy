@@ -45,6 +45,7 @@ class InboxItem(Base):
     )  # pending, completed, needs_confirmation
     journal_excerpt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    is_read: Mapped[bool] = mapped_column(default=False)
 
     # Relationship to journal entry
     journal_entry: Mapped[Optional["JournalEntry"]] = relationship(

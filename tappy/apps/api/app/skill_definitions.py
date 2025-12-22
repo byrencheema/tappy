@@ -137,39 +137,49 @@ job_search_handler = BrowserUseSkillHandler(
 
 
 # ============================================================================
-# EMAIL SKILL (Example - Not implemented)
+# GMAIL DRAFT SKILL
 # ============================================================================
 
-# Uncomment and implement when email skill is available
-# from app.skills import EmailParameters
-#
-# def format_email_result(result: SkillExecutionResult) -> FormattedSkillResult:
-#     """Format email sending results."""
-#     if result.status == SkillStatus.FAILED:
-#         return FormattedSkillResult(
-#             title="📧 Email Failed",
-#             message=f"Could not send email: {result.error}",
-#             status="pending"
-#         )
-#
-#     return FormattedSkillResult(
-#         title="📧 Email Sent",
-#         message=f"Your email was sent successfully.",
-#         action="View Sent",
-#         status="completed"
-#     )
-#
-# email_config = SkillConfig(
-#     id="email-skill-uuid",
-#     name="Send Email",
-#     skill_type=SkillType.ACTION,
-#     description="Sends emails on your behalf",
-#     parameter_schema=EmailParameters,
-#     example_params={"to": "example@example.com", "subject": "Hello", "body": "..."},
-#     planner_hints="Use when user wants to send an email, message someone, or reach out."
-# )
-#
-# email_handler = BrowserUseSkillHandler(config=email_config, formatter=format_email_result)
+from app.skills import EmailParameters
+
+
+def format_gmail_draft_result(result: SkillExecutionResult) -> FormattedSkillResult:
+    """Format Gmail draft results."""
+    if result.status == SkillStatus.FAILED:
+        return FormattedSkillResult(
+            title="📧 Draft Failed",
+            message=f"Could not save draft: {result.error}",
+            status="pending"
+        )
+
+    return FormattedSkillResult(
+        title="📧 Draft Saved",
+        message="Your email draft was saved to Gmail.",
+        action="View Drafts",
+        status="completed"
+    )
+
+
+gmail_draft_config = SkillConfig(
+    id="27441e62-faaf-4c15-855a-f7bbb479bbf0",
+    name="Save Gmail Draft",
+    skill_type=SkillType.ACTION,
+    description="Saves an email draft in Gmail with recipient, subject, and body",
+    parameter_schema=EmailParameters,
+    example_params={"to": "friend@example.com", "subject": "Quick update", "body": "Hey, just wanted to share..."},
+    planner_hints=(
+        "Trigger when journal mentions wanting to email someone, draft a message, "
+        "write to someone, reach out via email, or compose an email. Look for cues like "
+        "'should email', 'need to write to', 'send a message to', 'reach out to X about'. "
+        "Extract the recipient, subject, and body from context. "
+        "IMPORTANT: This is an ACTION skill - always require user confirmation before saving."
+    )
+)
+
+gmail_draft_handler = BrowserUseSkillHandler(
+    config=gmail_draft_config,
+    formatter=format_gmail_draft_result
+)
 
 
 # ============================================================================
@@ -909,6 +919,7 @@ def register_all_skills():
         (google_calendar_config, google_calendar_handler),
         (youtube_search_config, youtube_search_handler),
         (amazon_cart_config, amazon_cart_handler),
+        (gmail_draft_config, gmail_draft_handler),
     ]
 
     for config, handler in skills_to_register:

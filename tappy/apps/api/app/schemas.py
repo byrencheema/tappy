@@ -70,6 +70,7 @@ class InboxItemResponse(BaseModel):
     journal_entry_id: Optional[int] = None
     journal_excerpt: Optional[str] = None
     created_at: datetime
+    is_read: bool = False
     skill_result: Optional[Dict[str, Any]] = Field(None, description="Result from skill execution")
 
     class Config:

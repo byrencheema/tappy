@@ -74,8 +74,11 @@ gcloud auth application-default login
 Alternative (API key):
 - `GEMINI_API_KEY` — For AI intent analysis
 
+For Browser Use skills:
+- `BROWSER_USE_API_KEY` — API key from [cloud.browser-use.com](https://cloud.browser-use.com)
+- `BROWSER_USE_PROFILE_ID` — Profile ID for authenticated actions (Gmail, X.com, etc.)
+
 Optional:
-- `BROWSER_USE_API_KEY` — For web automation
 - `WEB_ORIGIN` — CORS origin (default: `http://localhost:3000`)
 
 ### Run the API
@@ -96,13 +99,31 @@ bun dev
 
 Visit `http://localhost:3000`
 
+## Skills
+
+Tappy uses [Browser Use](https://browser-use.com) to automate real browser actions. Current skills:
+
+| Skill | Type | Description |
+|-------|------|-------------|
+| Tech Job Search | data | Search for tech jobs |
+| HackerNews Top Posts | data | Fetch top HN posts |
+| Weather Forecast | data | Get weather forecast |
+| News Search | data | Search news articles |
+| YouTube Search | data | Search YouTube videos |
+| X.com Post Maker | action | Post tweets |
+| Google Calendar | action | Create calendar events |
+| Amazon Add to Cart | action | Add items to Amazon cart |
+| Save Gmail Draft | action | Save email drafts in Gmail |
+
+See `apps/api/SKILLS.md` for details on adding new skills.
+
 ## Features
 
 - **Rich text journal editor** — Notion-like writing experience with headers, lists, and formatting
 - **Smart intent detection** — Gemini AI analyzes entries and identifies actionable opportunities
 - **Inbox notifications** — Friendly messages from Tappy about actions taken or needing approval
 - **Persistent storage** — All journal entries and inbox items saved to SQLite
-- **Browser automation** — Tappy can search the web, fill forms, and complete tasks for you (via Browser Use)
+- **9 Browser Use skills** — Tappy can search the web, post tweets, create calendar events, and more
 
 ## API Endpoints
 
@@ -121,7 +142,7 @@ Visit `http://localhost:3000`
 ## Roadmap
 
 - [ ] User authentication
-- [ ] Browser Use skills (email, calendar, shopping)
+- [x] Browser Use skills (email, calendar, shopping)
 - [ ] Mobile app
 - [ ] Voice journal entries
 

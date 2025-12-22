@@ -95,6 +95,19 @@ export default function InboxPage() {
     }
   };
 
+  const handleSelectItem = async (id: number) => {
+    setSelectedId(id);
+    const item = items.find((i) => i.id === id);
+    if (item && !item.is_read) {
+      try {
+        const updated = await inboxApi.markAsRead(id);
+        setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
+      } catch (err) {
+        console.error("Failed to mark item as read:", err);
+      }
+    }
+  };
+
   const handleDismiss = async (id: number) => {
     try {
       await inboxApi.delete(id);
@@ -105,7 +118,7 @@ export default function InboxPage() {
   };
 
   const selectedItem = items.find((item) => item.id === selectedId);
-  const needsAttention = items.filter((i) => i.status === "needs_confirmation" || i.status === "pending").length;
+  const unreadCount = items.filter((i) => !i.is_read).length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -113,9 +126,9 @@ export default function InboxPage() {
       <header className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border">
         <div className="flex h-14 items-center gap-3 px-6">
           <h1 className="text-xl font-semibold text-foreground">Inbox</h1>
-          {needsAttention > 0 && (
-            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground">
-              {needsAttention}
+          {unreadCount > 0 && (
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1.5 text-xs font-medium text-white">
+              {unreadCount}
             </span>
           )}
         </div>
@@ -204,7 +217,7 @@ export default function InboxPage() {
                 return (
                   <button
                     key={item.id}
-                    onClick={() => setSelectedId(item.id)}
+                    onClick={() => handleSelectItem(item.id)}
                     className={`group w-full text-left rounded-lg px-3 py-2.5 mb-0.5 transition-all ${
                       isSelected
                         ? "bg-secondary/80"
@@ -212,9 +225,14 @@ export default function InboxPage() {
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2 mb-0.5">
-                      <span className={`text-sm text-foreground truncate ${isSelected ? "font-medium" : ""}`}>
-                        {item.title}
-                      </span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        {!item.is_read && (
+                          <div className="h-2 w-2 rounded-full bg-orange-500 flex-shrink-0" />
+                        )}
+                        <span className={`text-sm text-foreground truncate ${isSelected ? "font-medium" : ""}`}>
+                          {item.title}
+                        </span>
+                      </div>
                       <span className="text-[11px] text-muted-foreground flex-shrink-0">
                         {formatTimestamp(item.created_at)}
                       </span>
