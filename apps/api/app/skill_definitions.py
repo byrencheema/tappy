@@ -15,6 +15,10 @@ from app.skills import (
     HackerNewsParameters,
     WeatherParameters,
     NewsSearchParameters,
+    XPostParameters,
+    GoogleCalendarParameters,
+    YouTubeSearchParameters,
+    AmazonAddToCartParameters,
     SkillConfig,
     SkillStatus,
     SkillType,
@@ -519,6 +523,378 @@ news_handler = BrowserUseSkillHandler(
 
 
 # ============================================================================
+# X.COM POST MAKER SKILL
+# ============================================================================
+
+def format_xpost_result(result: SkillExecutionResult) -> FormattedSkillResult:
+    """Format X.com post result for inbox display."""
+
+    if result.status == SkillStatus.FAILED.value:
+        return FormattedSkillResult(
+            title="𝕏 Post Failed",
+            message=f"Unable to post: {result.error}",
+            status="pending"
+        )
+
+    try:
+        output = result.output
+        if not output or "result" not in output:
+            return FormattedSkillResult(
+                title="𝕏 Post - Unknown Status",
+                message="The post may have been sent but we couldn't confirm.",
+                status="pending"
+            )
+
+        result_data = output.get("result", {})
+
+        if not result_data.get("success", True):
+            error = result_data.get("error", {})
+            error_msg = error.get("message", "Unknown error")
+            return FormattedSkillResult(
+                title="𝕏 Post Failed",
+                message=error_msg,
+                status="pending"
+            )
+
+        data = result_data.get("data", {})
+        post_url = data.get("url", "")
+        posted_content = data.get("content", "Your post")
+
+        message = f"Posted: \"{posted_content[:100]}{'...' if len(posted_content) > 100 else ''}\""
+        if post_url:
+            message += f"\n\n🔗 {post_url}"
+
+        return FormattedSkillResult(
+            title="𝕏 Posted Successfully",
+            message=message,
+            action="View Post",
+            status="completed"
+        )
+
+    except Exception as e:
+        return FormattedSkillResult(
+            title="𝕏 Post - Format Error",
+            message=f"Action completed but couldn't format result: {str(e)}",
+            status="pending"
+        )
+
+
+xpost_config = SkillConfig(
+    id="eb6153e1-1e95-4e5b-88ac-5158c9207b9c",
+    name="X.com Post Maker",
+    skill_type=SkillType.ACTION,
+    description="Posts content to X.com (Twitter) on your behalf",
+    parameter_schema=XPostParameters,
+    example_params={"content": "Just had a great insight about..."},
+    planner_hints=(
+        "Trigger when journal reflects a desire to share publicly, post more, take action, "
+        "be more visible, or contains a thought worth sharing. Look for cues like "
+        "'I should post this', 'want to share', 'hot take', 'need to put myself out there', "
+        "'should be more active online', 'this would make a good tweet'. "
+        "Extract the core insight or thought and craft it into a concise post. "
+        "IMPORTANT: This is an ACTION skill - always require user confirmation before posting."
+    )
+)
+
+xpost_handler = BrowserUseSkillHandler(
+    config=xpost_config,
+    formatter=format_xpost_result
+)
+
+
+# ============================================================================
+# GOOGLE CALENDAR SKILL
+# ============================================================================
+
+def format_google_calendar_result(result: SkillExecutionResult) -> FormattedSkillResult:
+    """Format Google Calendar event creation result for inbox display."""
+
+    if result.status == SkillStatus.FAILED.value:
+        return FormattedSkillResult(
+            title="📅 Calendar Event Failed",
+            message=f"Unable to create event: {result.error}",
+            status="pending"
+        )
+
+    try:
+        output = result.output
+        if not output or "result" not in output:
+            return FormattedSkillResult(
+                title="📅 Calendar Event - Unknown Status",
+                message="The event may have been created but we couldn't confirm.",
+                status="pending"
+            )
+
+        result_data = output.get("result", {})
+
+        if not result_data.get("success", True):
+            error = result_data.get("error", {})
+            error_msg = error.get("message", "Unknown error")
+            return FormattedSkillResult(
+                title="📅 Calendar Event Failed",
+                message=error_msg,
+                status="pending"
+            )
+
+        data = result_data.get("data", {})
+        event_title = data.get("title", "Your event")
+        event_date = data.get("date", "")
+        event_time = data.get("time", "")
+        event_url = data.get("url", "")
+        output_text = data.get("output", "")
+
+        # Check if it's a template link
+        is_template = "action=TEMPLATE" in output_text or "calendar/render" in output_text
+
+        if is_template:
+            # Extract URL from output text
+            import re
+            url_match = re.search(r'https://calendar\.google\.com/[^\s]+', output_text)
+            template_url = url_match.group(0) if url_match else ""
+
+            message = "Event details ready - click to add to your calendar"
+            if template_url:
+                message += f"\n\n🔗 {template_url}"
+
+            return FormattedSkillResult(
+                title="📅 Calendar Event Ready",
+                message=message,
+                action="Add to Calendar",
+                status="needs_confirmation"
+            )
+
+        message = f"Created: \"{event_title}\""
+        if event_date and event_time:
+            message += f"\n📆 {event_date} at {event_time}"
+        if event_url:
+            message += f"\n\n🔗 {event_url}"
+
+        return FormattedSkillResult(
+            title="📅 Event Created Successfully",
+            message=message,
+            action="View Calendar",
+            status="completed"
+        )
+
+    except Exception as e:
+        return FormattedSkillResult(
+            title="📅 Calendar - Format Error",
+            message=f"Action completed but couldn't format result: {str(e)}",
+            status="pending"
+        )
+
+
+google_calendar_config = SkillConfig(
+    id="20f63d34-afa9-4e18-b361-47edd270c3ca",
+    name="Google Calendar",
+    skill_type=SkillType.ACTION,
+    description="Creates calendar events with title, date/time, description, and location",
+    parameter_schema=GoogleCalendarParameters,
+    example_params={
+        "title": "Team Meeting",
+        "date": "2025-01-15",
+        "time": "14:00",
+        "description": "Weekly sync",
+        "location": "Conference Room A",
+        "duration_minutes": 60
+    },
+    planner_hints=(
+        "Trigger when journal mentions scheduling, planning meetings, setting reminders, "
+        "appointments, or time-based commitments. Look for cues like 'need to schedule', "
+        "'should set up a meeting', 'don't forget to', 'remind me to', 'at X o'clock', "
+        "'on Monday', 'next week'. Extract the event details from context. "
+        "IMPORTANT: This is an ACTION skill - always require user confirmation before creating."
+    )
+)
+
+google_calendar_handler = BrowserUseSkillHandler(
+    config=google_calendar_config,
+    formatter=format_google_calendar_result
+)
+
+
+# ============================================================================
+# YOUTUBE SEARCH SKILL
+# ============================================================================
+
+def format_youtube_result(result: SkillExecutionResult) -> FormattedSkillResult:
+    """Format YouTube search results for inbox display."""
+
+    if result.status == SkillStatus.FAILED.value:
+        return FormattedSkillResult(
+            title="▶️ YouTube Search Failed",
+            message=f"Unable to search: {result.error}",
+            status="pending"
+        )
+
+    try:
+        output = result.output
+        if not output or "result" not in output:
+            return FormattedSkillResult(
+                title="▶️ YouTube - No Results",
+                message="The search completed but returned no data.",
+                status="pending"
+            )
+
+        result_data = output.get("result", {})
+
+        if not result_data.get("success", True):
+            error = result_data.get("error", {})
+            error_msg = error.get("message", "Unknown error")
+            error_code = error.get("code", "ERROR")
+            return FormattedSkillResult(
+                title="▶️ YouTube Search Failed",
+                message=f"{error_code}: {error_msg}",
+                status="pending"
+            )
+
+        data = result_data.get("data", {})
+        videos = data.get("results", []) or data.get("videos", [])
+
+        if not videos:
+            return FormattedSkillResult(
+                title="▶️ No Videos Found",
+                message="No YouTube videos found. Try a different search.",
+                status="pending"
+            )
+
+        top_videos = videos[:6]
+        video_lines = []
+
+        for idx, video in enumerate(top_videos, 1):
+            title = video.get("title", "Untitled Video")
+            channel = video.get("channel", "Unknown Channel")
+            views = video.get("view_count", video.get("views", "Unknown views"))
+
+            video_lines.append(f"{idx}. {title}")
+            video_lines.append(f"   📺 {channel}")
+            video_lines.append(f"   👁️  {views}")
+            video_lines.append("")
+
+        message = "\n".join(video_lines)
+
+        return FormattedSkillResult(
+            title=f"▶️ Found {len(videos)} video{'s' if len(videos) != 1 else ''}",
+            message=message,
+            action="Watch Videos",
+            status="needs_confirmation"
+        )
+
+    except Exception as e:
+        return FormattedSkillResult(
+            title="▶️ YouTube - Format Error",
+            message=f"Results received but couldn't be formatted: {str(e)}",
+            status="pending"
+        )
+
+
+youtube_search_config = SkillConfig(
+    id="e6cec7da-4d28-4fc2-91e5-0f7cf4602196",
+    name="YouTube Search",
+    skill_type=SkillType.DATA_RETRIEVAL,
+    description="Searches YouTube and extracts video titles, channels, and view counts",
+    parameter_schema=YouTubeSearchParameters,
+    example_params={"query": "Python tutorials", "max_results": 10},
+    planner_hints=(
+        "Trigger when journal mentions wanting to learn something via video, tutorials, "
+        "how-to content, entertainment, or visual explanations. Look for cues like "
+        "'want to watch', 'need a tutorial on', 'looking for videos about', "
+        "'should learn how to', 'need to see how'. Extract the search topic from context."
+    )
+)
+
+youtube_search_handler = BrowserUseSkillHandler(
+    config=youtube_search_config,
+    formatter=format_youtube_result
+)
+
+
+# ============================================================================
+# AMAZON ADD TO CART SKILL
+# ============================================================================
+
+def format_amazon_cart_result(result: SkillExecutionResult) -> FormattedSkillResult:
+    """Format Amazon add to cart result for inbox display."""
+
+    if result.status == SkillStatus.FAILED.value:
+        return FormattedSkillResult(
+            title="🛒 Amazon Cart Failed",
+            message=f"Unable to add to cart: {result.error}",
+            status="pending"
+        )
+
+    try:
+        output = result.output
+        if not output or "result" not in output:
+            return FormattedSkillResult(
+                title="🛒 Amazon Cart - Unknown Status",
+                message="The item may have been added but we couldn't confirm.",
+                status="pending"
+            )
+
+        result_data = output.get("result", {})
+
+        if not result_data.get("success", True):
+            error = result_data.get("error", {})
+            error_msg = error.get("message", "Unknown error")
+            return FormattedSkillResult(
+                title="🛒 Amazon Cart Failed",
+                message=error_msg,
+                status="pending"
+            )
+
+        data = result_data.get("data", {})
+        product_name = data.get("product_name", "Your item")
+        price = data.get("price", "")
+        quantity = data.get("quantity", 1)
+        cart_url = data.get("cart_url", "")
+
+        message = f"Added: \"{product_name}\""
+        if quantity > 1:
+            message += f" (x{quantity})"
+        if price:
+            message += f"\n💰 {price}"
+        if cart_url:
+            message += f"\n\n🔗 {cart_url}"
+
+        return FormattedSkillResult(
+            title="🛒 Added to Amazon Cart",
+            message=message,
+            action="View Cart",
+            status="completed"
+        )
+
+    except Exception as e:
+        return FormattedSkillResult(
+            title="🛒 Amazon - Format Error",
+            message=f"Action completed but couldn't format result: {str(e)}",
+            status="pending"
+        )
+
+
+amazon_cart_config = SkillConfig(
+    id="adbd36f2-a522-4f06-b458-946bd236ded2",
+    name="Amazon Add to Cart",
+    skill_type=SkillType.ACTION,
+    description="Searches for products on Amazon and adds them to your cart",
+    parameter_schema=AmazonAddToCartParameters,
+    example_params={"product_query": "wireless headphones", "quantity": 1},
+    planner_hints=(
+        "Trigger when journal mentions needing to buy something, shopping for items, "
+        "running low on supplies, or wanting to purchase. Look for cues like "
+        "'need to buy', 'should order', 'running out of', 'want to get', "
+        "'looking for a new', 'add to my cart'. Extract the product from context. "
+        "IMPORTANT: This is an ACTION skill - always require user confirmation before adding."
+    )
+)
+
+amazon_cart_handler = BrowserUseSkillHandler(
+    config=amazon_cart_config,
+    formatter=format_amazon_cart_result
+)
+
+
+# ============================================================================
 # REGISTRATION
 # ============================================================================
 
@@ -529,6 +905,10 @@ def register_all_skills():
         (hackernews_config, hackernews_handler),
         (weather_config, weather_handler),
         (news_config, news_handler),
+        (xpost_config, xpost_handler),
+        (google_calendar_config, google_calendar_handler),
+        (youtube_search_config, youtube_search_handler),
+        (amazon_cart_config, amazon_cart_handler),
     ]
 
     for config, handler in skills_to_register:

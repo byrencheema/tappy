@@ -64,24 +64,21 @@ await client.skills.refine_skill(
 )
 ```
 
-## Using Skills with Agent
+## Authenticated Actions
 
-For authenticated actions (like posting tweets), use the Agent with skills:
+For ACTION type skills (like posting tweets), the system automatically uses the Session+Task API
+with profile-based cookie injection. This requires `BROWSER_USE_PROFILE_ID` in your `.env`.
 
-```python
-from browser_use import Agent, ChatBrowserUse
+The flow:
+1. Creates a session with your profile (cookies injected)
+2. Runs a task that uses the skill
+3. Polls for completion
+4. Cleans up the session
 
-agent = Agent(
-    task='Post a tweet saying "Hello World"',
-    skills=['tweet-poster-skill-id'],
-    llm=ChatBrowserUse()
-)
-
-await agent.run()
-await agent.close()
-```
-
-The Agent handles cookie injection automatically for authenticated sites.
+Profile setup:
+1. Go to [cloud.browser-use.com](https://cloud.browser-use.com)
+2. Create a browser profile and log into sites you need (e.g., X.com)
+3. Copy the profile ID to your `.env` as `BROWSER_USE_PROFILE_ID`
 
 ## Registered Skills
 
@@ -91,10 +88,27 @@ The Agent handles cookie injection automatically for authenticated sites.
 | HackerNews Top Posts | `962a620b-607b-4c08-a51f-0376f24c1938` | data_retrieval |
 | Weather Forecast | `911880ed-b5a9-408e-803e-db1279585bab` | data_retrieval |
 | News Search | `7ed94633-2162-4b78-a958-ba924b58c6e0` | data_retrieval |
+| X.com Post Maker | `eb6153e1-1e95-4e5b-88ac-5158c9207b9c` | action |
+| Google Calendar | `20f63d34-afa9-4e18-b361-47edd270c3ca` | action |
+| YouTube Search | `e6cec7da-4d28-4fc2-91e5-0f7cf4602196` | data_retrieval |
+| Amazon Add to Cart | `adbd36f2-a522-4f06-b458-946bd236ded2` | action |
 
 ## Adding New Skills
 
-1. Create skill on Browser Use Cloud
+### Data Retrieval Skills (fast, direct API call)
+
+1. Create skill on [cloud.browser-use.com/skills](https://cloud.browser-use.com/skills)
 2. Add parameter schema to `app/skills.py`
-3. Add formatter and config to `app/skill_definitions.py`
+3. Add formatter and config to `app/skill_definitions.py` with `SkillType.DATA_RETRIEVAL`
 4. Register in `register_all_skills()`
+
+### Action Skills (authenticated, uses browser session)
+
+1. Create skill on [cloud.browser-use.com/skills](https://cloud.browser-use.com/skills)
+2. Log into the required site in your Browser Use profile
+3. Add parameter schema to `app/skills.py`
+4. Add formatter and config to `app/skill_definitions.py` with `SkillType.ACTION`
+5. Add task description builder in `_build_task_description()` in `app/skills.py`
+6. Register in `register_all_skills()`
+
+**Note:** Action skills run a full browser session (~30-40s) vs instant for data retrieval.
