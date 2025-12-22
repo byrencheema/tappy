@@ -46,7 +46,20 @@ def format_job_search_result(result: SkillExecutionResult) -> FormattedSkillResu
                 status="pending"
             )
 
-        data = output.get("result", {}).get("data", {})
+        result_data = output.get("result", {})
+
+        # Check for API errors (rate limiting, etc.)
+        if not result_data.get("success", True):
+            error = result_data.get("error", {})
+            error_msg = error.get("message", "Unknown error")
+            error_code = error.get("code", "ERROR")
+            return FormattedSkillResult(
+                title="💼 Job Search Failed",
+                message=f"{error_code}: {error_msg}",
+                status="pending"
+            )
+
+        data = result_data.get("data", {})
         jobs = data.get("jobs", [])
         total_count = data.get("count", len(jobs))
 
@@ -104,9 +117,11 @@ job_search_config = SkillConfig(
         "limit": 10
     },
     planner_hints=(
-        "Use when user mentions: job search, finding jobs, career opportunities, "
-        "hiring, positions, roles, employment. Extract keywords, company names "
-        "(prefix with @company:), and locations (prefix with @location:). "
+        "Trigger when journal reflects career frustration, job dissatisfaction, "
+        "wanting a change, feeling stuck at work, considering new opportunities, "
+        "or mentions specific roles/companies they admire. Look for emotional cues like "
+        "'hate my job', 'need a change', 'thinking about leaving', 'wish I worked at'. "
+        "Extract relevant skills, industries, or locations mentioned. "
         "Expand location abbreviations (SF→San Francisco, NYC→New York City, etc.)."
     )
 )
@@ -216,6 +231,18 @@ def format_hackernews_result(result: SkillExecutionResult) -> FormattedSkillResu
 
         # Parse response - handle different structures
         result_data = output.get("result", {})
+
+        # Check for API errors (rate limiting, etc.)
+        if not result_data.get("success", True):
+            error = result_data.get("error", {})
+            error_msg = error.get("message", "Unknown error")
+            error_code = error.get("code", "ERROR")
+            return FormattedSkillResult(
+                title="🔶 HackerNews Fetch Failed",
+                message=f"{error_code}: {error_msg}",
+                status="pending"
+            )
+
         data = result_data.get("data", {})
         posts = data.get("posts", [])
 
@@ -264,8 +291,10 @@ hackernews_config = SkillConfig(
     parameter_schema=HackerNewsParameters,
     example_params={"limit": 10},
     planner_hints=(
-        "Use when user wants to see: HackerNews posts, tech news, trending tech discussions, "
-        "what's popular on HN, tech community news."
+        "Trigger when journal mentions feeling out of the loop on tech, curiosity about "
+        "what developers are talking about, wanting to stay current, or reflects on "
+        "tech industry trends. Look for cues like 'wonder what's new in tech', "
+        "'feel behind on trends', 'curious what other devs think about'."
     )
 )
 
@@ -298,7 +327,21 @@ def format_weather_result(result: SkillExecutionResult) -> FormattedSkillResult:
                 status="pending"
             )
 
-        data = output.get("result", {})
+        # Parse nested structure: result.data contains the actual weather data
+        result_data = output.get("result", {})
+
+        # Check for API errors (rate limiting, etc.)
+        if not result_data.get("success", True):
+            error = result_data.get("error", {})
+            error_msg = error.get("message", "Unknown error")
+            error_code = error.get("code", "ERROR")
+            return FormattedSkillResult(
+                title="🌤️ Weather Forecast Failed",
+                message=f"{error_code}: {error_msg}",
+                status="pending"
+            )
+
+        data = result_data.get("data", {})
         location = data.get("location", "Unknown location")
         forecasts = data.get("forecast", [])
         current = data.get("current", {})
@@ -359,10 +402,11 @@ weather_config = SkillConfig(
     parameter_schema=WeatherParameters,
     example_params={"location": "San Francisco", "days": 3, "units": "e"},
     planner_hints=(
-        "Use when user mentions: weather, forecast, temperature, rain, snow, "
-        "planning trips, what to wear, outdoor activities. "
-        "IMPORTANT: Extract and expand location abbreviations (SF→San Francisco, NYC→New York City, etc.) "
-        "to full city names for accurate weather lookups."
+        "Trigger when journal mentions planning outdoor activities, upcoming trips, "
+        "wondering what to wear, hoping for good weather, or concerns about rain/storms. "
+        "Look for cues like 'planning a hike', 'going to the beach', 'hope it doesn't rain', "
+        "'packing for my trip to', 'weekend plans'. Extract the location from context. "
+        "Expand abbreviations (SF→San Francisco, NYC→New York City, LA→Los Angeles, etc.)."
     )
 )
 
@@ -395,14 +439,27 @@ def format_news_result(result: SkillExecutionResult) -> FormattedSkillResult:
                 status="pending"
             )
 
-        data = output.get("result", {})
+        # Parse nested structure: result.data contains the actual news data
+        result_data = output.get("result", {})
+
+        # Check for API errors (rate limiting, etc.)
+        if not result_data.get("success", True):
+            error = result_data.get("error", {})
+            error_msg = error.get("message", "Unknown error")
+            error_code = error.get("code", "ERROR")
+            return FormattedSkillResult(
+                title="📰 News Search Failed",
+                message=f"{error_code}: {error_msg}",
+                status="pending"
+            )
+
+        data = result_data.get("data", {})
         articles = data.get("articles", [])
-        query = data.get("query", "your topic")
 
         if not articles:
             return FormattedSkillResult(
                 title="📰 No Articles Found",
-                message=f"No news articles found for '{query}'.",
+                message="No news articles found. Try a different search.",
                 status="pending"
             )
 
@@ -448,8 +505,10 @@ news_config = SkillConfig(
     parameter_schema=NewsSearchParameters,
     example_params={"query": "AI developments", "max_results": 5},
     planner_hints=(
-        "Use when user wants: news, articles, updates, latest on a topic, "
-        "current events, headlines, breaking news."
+        "Trigger when journal reflects curiosity about current events, wondering what's happening "
+        "with a topic/company/industry, feeling uninformed, or mentions something they heard about. "
+        "Look for cues like 'wonder what X is up to', 'heard something about', 'curious about', "
+        "'want to catch up on', 'what's happening with'. Extract the topic of interest."
     )
 )
 

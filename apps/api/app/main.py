@@ -2,19 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
-import httpx
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 from dotenv import load_dotenv
 
-# Load .env file from the api directory
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,7 +31,7 @@ from .schemas import (
     SkillExecutionResult,
 )
 from .skills import get_registry, SkillStatus
-from . import skill_definitions  # Auto-registers skills
+from . import skill_definitions
 
 try:
     from google import genai
@@ -43,23 +42,33 @@ except Exception as exc:
     ) from exc
 
 
-# =============================================================================
-# SKILL CONFIGURATION
-# =============================================================================
-
-# Skills are now configured in skill_definitions.py
-# The registry auto-loads on import
+job_queue: asyncio.Queue[Tuple[int, str]] = asyncio.Queue()
 
 
-# =============================================================================
-# LIFESPAN & CONFIG
-# =============================================================================
+async def _queue_worker() -> None:
+    """Process journal entries one at a time to avoid rate limits."""
+    while True:
+        entry_id, text = await job_queue.get()
+        try:
+            await _process_entry_background(entry_id, text)
+        except Exception as e:
+            print(f"[Queue] Error processing entry {entry_id}: {e}")
+        finally:
+            job_queue.task_done()
+            await asyncio.sleep(0.5)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize database on startup."""
     await init_db()
+    worker_task = asyncio.create_task(_queue_worker())
+    print("✓ Job queue worker started")
     yield
+    worker_task.cancel()
+    try:
+        await worker_task
+    except asyncio.CancelledError:
+        pass
 
 
 def _get_allowed_origins() -> List[str]:
@@ -68,35 +77,17 @@ def _get_allowed_origins() -> List[str]:
 
 
 def _get_genai_client() -> genai.Client:
-    """Get Gemini client via Vertex AI with API Key authentication."""
     api_key = os.getenv("GOOGLE_CLOUD_API_KEY")
-
     if not api_key:
-        raise HTTPException(
-            status_code=500,
-            detail="GOOGLE_CLOUD_API_KEY is not configured"
-        )
-
+        raise HTTPException(status_code=500, detail="GOOGLE_CLOUD_API_KEY is not configured")
     return genai.Client(vertexai=True, api_key=api_key)
 
 
-# =============================================================================
-# PLANNER - Detects when to execute skills
-# =============================================================================
-
 def _planner_prompt(text: str) -> str:
-    """
-    Generate planner prompt dynamically based on registered skills.
-    The AI decides if the journal entry warrants any skill execution.
-    """
     registry = get_registry()
     skills_context = registry.get_planner_context()
-
-    # Get all skills for JSON schema examples
     skills = registry.list_skills()
-    skill_examples = []
-    for skill in skills:
-        skill_examples.append(f'  - skill_id: "{skill.id}", skill_name: "{skill.name}"')
+    skill_examples = [f'  - skill_id: "{s.id}", skill_name: "{s.name}"' for s in skills]
 
     return f"""You are Tappy, a helpful journal assistant that can take actions for users.
 
@@ -127,7 +118,6 @@ Journal entry:
 
 
 def _extract_response_text(response: Any) -> str:
-    """Best-effort extraction of JSON text from the SDK response."""
     if hasattr(response, "text") and response.text:
         return response.text
     try:
@@ -137,17 +127,13 @@ def _extract_response_text(response: Any) -> str:
 
 
 def _parse_plan(raw_text: str) -> PlannerResult:
-    """Parse the planner's JSON response into a PlannerResult."""
     try:
         payload = json.loads(raw_text)
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=502, detail=f"Planner returned invalid JSON: {exc}")
-    
-    # Handle parameters
-    params = None
-    if payload.get("parameters"):
-        params = SkillParameters(**payload["parameters"])
-    
+
+    params = SkillParameters(**payload["parameters"]) if payload.get("parameters") else None
+
     return PlannerResult(
         should_act=payload.get("should_act", False),
         skill_id=payload.get("skill_id"),
@@ -158,43 +144,27 @@ def _parse_plan(raw_text: str) -> PlannerResult:
 
 
 async def _plan_action(text: str) -> PlannerResult:
-    """Run the planner to decide if we should execute a skill."""
     client = _get_genai_client()
     response = client.models.generate_content(
         model=os.getenv("GENAI_MODEL", "gemini-2.0-flash"),
         contents=[_planner_prompt(text)],
         config=types.GenerateContentConfig(response_mime_type="application/json"),
     )
-    raw_text = _extract_response_text(response)
-    return _parse_plan(raw_text)
+    return _parse_plan(_extract_response_text(response))
 
-
-# =============================================================================
-# SKILL EXECUTION - Registry-based
-# =============================================================================
 
 async def _execute_skill(skill_id: str, parameters: dict) -> SkillExecutionResult:
-    """
-    Execute a skill using the registry system.
-    Supports any registered skill with its own parameter schema.
-    """
     registry = get_registry()
     handler = registry.get_handler(skill_id)
     config = registry.get_config(skill_id)
 
     if not handler or not config:
-        return SkillExecutionResult(
-            status="failed",
-            skill_id=skill_id,
-            error=f"Skill {skill_id} is not registered"
-        )
+        return SkillExecutionResult(status="failed", skill_id=skill_id, error=f"Skill {skill_id} is not registered")
 
-    # Check for test mode (skip actual API call)
     if os.getenv("SKILLS_TEST_MODE") == "true":
         print(f"[TEST MODE] Would execute skill {config.name} with params: {parameters}")
-        from .skills import SkillStatus as SS
         return SkillExecutionResult(
-            status=SS.COMPLETED.value,
+            status=SkillStatus.COMPLETED.value,
             skill_id=skill_id,
             skill_name=config.name,
             skill_type=config.skill_type.value,
@@ -217,59 +187,38 @@ async def _execute_skill(skill_id: str, parameters: dict) -> SkillExecutionResul
         return SkillExecutionResult(
             status="failed",
             skill_id=skill_id,
-            error="BROWSER_USE_API_KEY is not configured. Get one at https://cloud.browser-use.com"
+            error="BROWSER_USE_API_KEY is not configured"
         )
 
     try:
-        # Parse parameters using skill's parameter schema
         param_instance = config.parameter_schema(**parameters)
-
-        # Execute via handler
         print(f"Executing skill {config.name} with params: {parameters}")
         result = await handler.execute(param_instance, api_key)
         print(f"Skill execution result: status={result.status}")
         return result
-
     except Exception as exc:
         print(f"Skill execution error: {exc}")
-        return SkillExecutionResult(
-            status="failed",
-            skill_id=skill_id,
-            error=f"Execution error: {str(exc)}"
-        )
+        return SkillExecutionResult(status="failed", skill_id=skill_id, error=f"Execution error: {str(exc)}")
 
-
-# =============================================================================
-# BACKGROUND PROCESSING - Tappy discovers things async
-# =============================================================================
 
 async def _process_entry_background(entry_id: int, text: str) -> None:
-    """
-    Background task: Analyze entry and create inbox items.
-    Runs after save returns, so user isn't blocked.
-    """
     async with async_session_maker() as session:
         try:
-            # Run planner
             plan = await _plan_action(text)
 
             if not plan.should_act or not plan.skill_id or not plan.parameters:
-                print(f"[Background] Entry {entry_id}: No action needed - {plan.reason}")
+                print(f"[Queue] Entry {entry_id}: No action needed - {plan.reason}")
                 return
 
-            # Execute skill
             params_dict = plan.parameters.model_dump(exclude_none=True)
-            print(f"[Background] Entry {entry_id}: Executing {plan.skill_name}")
+            print(f"[Queue] Entry {entry_id}: Executing {plan.skill_name}")
             execution = await _execute_skill(plan.skill_id, params_dict)
 
             if execution.status != SkillStatus.COMPLETED.value:
-                print(f"[Background] Entry {entry_id}: Skill failed - {execution.error}")
+                print(f"[Queue] Entry {entry_id}: Skill failed - {execution.error}")
                 return
 
-            # Format and save inbox item
-            registry = get_registry()
-            handler = registry.get_handler(plan.skill_id)
-
+            handler = get_registry().get_handler(plan.skill_id)
             if handler:
                 formatted = handler.format_result(execution)
                 inbox_item = InboxItem(
@@ -282,18 +231,12 @@ async def _process_entry_background(entry_id: int, text: str) -> None:
                 )
                 session.add(inbox_item)
                 await session.commit()
-                print(f"[Background] Entry {entry_id}: Created inbox item '{formatted.title}'")
-
+                print(f"[Queue] Entry {entry_id}: Created inbox item '{formatted.title}'")
         except Exception as e:
-            print(f"[Background] Entry {entry_id}: Error - {e}")
+            print(f"[Queue] Entry {entry_id}: Error - {e}")
 
-
-# =============================================================================
-# HELPERS
-# =============================================================================
 
 def _extract_title_from_content(content_json: str) -> Optional[str]:
-    """Extract title from first header block in Editor.js content."""
     try:
         content = json.loads(content_json)
         for block in content.get("blocks", []):
@@ -305,15 +248,10 @@ def _extract_title_from_content(content_json: str) -> Optional[str]:
 
 
 def _get_preview(text: str, max_length: int = 150) -> str:
-    """Get a preview of the text, truncated to max_length."""
     if len(text) <= max_length:
         return text
     return text[:max_length].rsplit(" ", 1)[0] + "..."
 
-
-# =============================================================================
-# FASTAPI APP
-# =============================================================================
 
 app = FastAPI(title="Tappy Journal API", version="0.2.0", lifespan=lifespan)
 app.add_middleware(
@@ -325,13 +263,10 @@ app.add_middleware(
 )
 
 
-# Health Check
 @app.get("/")
 async def healthcheck() -> dict[str, str]:
     return {"status": "ok"}
 
-
-# ============== Journal Entry Routes ==============
 
 @app.get("/journal", response_model=List[JournalEntryListItem])
 async def list_journal_entries(
@@ -339,12 +274,8 @@ async def list_journal_entries(
     limit: int = 50,
     offset: int = 0,
 ) -> List[JournalEntryListItem]:
-    """List all journal entries, newest first."""
     stmt = (
-        select(
-            JournalEntry,
-            func.count(InboxItem.id).label("actions_triggered")
-        )
+        select(JournalEntry, func.count(InboxItem.id).label("actions_triggered"))
         .outerjoin(InboxItem)
         .group_by(JournalEntry.id)
         .order_by(JournalEntry.created_at.desc())
@@ -352,8 +283,6 @@ async def list_journal_entries(
         .limit(limit)
     )
     result = await session.execute(stmt)
-    rows = result.all()
-
     return [
         JournalEntryListItem(
             id=entry.id,
@@ -362,7 +291,7 @@ async def list_journal_entries(
             created_at=entry.created_at,
             actions_triggered=actions_count,
         )
-        for entry, actions_count in rows
+        for entry, actions_count in result.all()
     ]
 
 
@@ -371,19 +300,13 @@ async def get_journal_entry(
     entry_id: int,
     session: AsyncSession = Depends(get_session),
 ) -> JournalEntryResponse:
-    """Get a single journal entry by ID."""
     stmt = (
-        select(
-            JournalEntry,
-            func.count(InboxItem.id).label("actions_triggered")
-        )
+        select(JournalEntry, func.count(InboxItem.id).label("actions_triggered"))
         .outerjoin(InboxItem)
         .where(JournalEntry.id == entry_id)
         .group_by(JournalEntry.id)
     )
-    result = await session.execute(stmt)
-    row = result.first()
-
+    row = (await session.execute(stmt)).first()
     if not row:
         raise HTTPException(status_code=404, detail="Journal entry not found")
 
@@ -401,25 +324,15 @@ async def get_journal_entry(
 @app.post("/journal", response_model=JournalEntryResponse)
 async def create_journal_entry(
     payload: JournalEntryCreate,
-    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
 ) -> JournalEntryResponse:
-    """Create a new journal entry. Returns instantly, Tappy processes in background."""
-    # Use explicit title if provided, otherwise extract from content
     title = payload.title or _extract_title_from_content(payload.content_json)
-
-    # Create the journal entry
-    entry = JournalEntry(
-        title=title,
-        text=payload.text,
-        content_json=payload.content_json,
-    )
+    entry = JournalEntry(title=title, text=payload.text, content_json=payload.content_json)
     session.add(entry)
     await session.commit()
     await session.refresh(entry)
 
-    # Fire off background processing - Tappy will discover things async
-    background_tasks.add_task(_process_entry_background, entry.id, payload.text)
+    await job_queue.put((entry.id, payload.text))
 
     return JournalEntryResponse(
         id=entry.id,
@@ -427,7 +340,7 @@ async def create_journal_entry(
         text=entry.text,
         content_json=entry.content_json,
         created_at=entry.created_at,
-        actions_triggered=0,  # Will be updated when background task completes
+        actions_triggered=0,
     )
 
 
@@ -436,21 +349,15 @@ async def delete_journal_entry(
     entry_id: int,
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, str]:
-    """Delete a journal entry."""
     stmt = select(JournalEntry).where(JournalEntry.id == entry_id)
-    result = await session.execute(stmt)
-    entry = result.scalar_one_or_none()
-
+    entry = (await session.execute(stmt)).scalar_one_or_none()
     if not entry:
         raise HTTPException(status_code=404, detail="Journal entry not found")
 
     await session.delete(entry)
     await session.commit()
-
     return {"status": "deleted"}
 
-
-# ============== Inbox Routes ==============
 
 @app.get("/inbox", response_model=List[InboxItemResponse])
 async def list_inbox_items(
@@ -458,16 +365,8 @@ async def list_inbox_items(
     limit: int = 50,
     offset: int = 0,
 ) -> List[InboxItemResponse]:
-    """List all inbox items, newest first."""
-    stmt = (
-        select(InboxItem)
-        .order_by(InboxItem.created_at.desc())
-        .offset(offset)
-        .limit(limit)
-    )
-    result = await session.execute(stmt)
-    items = result.scalars().all()
-
+    stmt = select(InboxItem).order_by(InboxItem.created_at.desc()).offset(offset).limit(limit)
+    items = (await session.execute(stmt)).scalars().all()
     return [
         InboxItemResponse(
             id=item.id,
@@ -488,11 +387,8 @@ async def get_inbox_item(
     item_id: int,
     session: AsyncSession = Depends(get_session),
 ) -> InboxItemResponse:
-    """Get a single inbox item by ID."""
     stmt = select(InboxItem).where(InboxItem.id == item_id)
-    result = await session.execute(stmt)
-    item = result.scalar_one_or_none()
-
+    item = (await session.execute(stmt)).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Inbox item not found")
 
@@ -514,11 +410,8 @@ async def update_inbox_item(
     payload: InboxItemUpdate,
     session: AsyncSession = Depends(get_session),
 ) -> InboxItemResponse:
-    """Update an inbox item (e.g., change status)."""
     stmt = select(InboxItem).where(InboxItem.id == item_id)
-    result = await session.execute(stmt)
-    item = result.scalar_one_or_none()
-
+    item = (await session.execute(stmt)).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Inbox item not found")
 
@@ -551,15 +444,11 @@ async def delete_inbox_item(
     item_id: int,
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, str]:
-    """Delete an inbox item."""
     stmt = select(InboxItem).where(InboxItem.id == item_id)
-    result = await session.execute(stmt)
-    item = result.scalar_one_or_none()
-
+    item = (await session.execute(stmt)).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Inbox item not found")
 
     await session.delete(item)
     await session.commit()
-
     return {"status": "deleted"}
