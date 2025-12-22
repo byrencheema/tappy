@@ -38,6 +38,7 @@ export type InboxItemResponse = {
   journal_entry_id: number | null;
   journal_excerpt: string | null;
   created_at: string;
+  is_read: boolean;
   skill_result?: Record<string, unknown> | null;
 };
 

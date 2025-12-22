@@ -15,6 +15,7 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,6 +44,18 @@ except Exception as exc:
 
 
 job_queue: asyncio.Queue[Tuple[int, str]] = asyncio.Queue()
+
+sse_clients: list[asyncio.Queue] = []
+
+
+async def broadcast_inbox_item(item_data: dict) -> None:
+    """Broadcast a new inbox item to all connected SSE clients."""
+    message = json.dumps(item_data)
+    for queue in sse_clients:
+        try:
+            queue.put_nowait(message)
+        except asyncio.QueueFull:
+            pass
 
 
 async def _queue_worker() -> None:
@@ -131,6 +144,9 @@ def _parse_plan(raw_text: str) -> PlannerResult:
         payload = json.loads(raw_text)
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=502, detail=f"Planner returned invalid JSON: {exc}")
+
+    if isinstance(payload, list):
+        payload = payload[0] if payload else {}
 
     params = SkillParameters(**payload["parameters"]) if payload.get("parameters") else None
 
@@ -231,7 +247,20 @@ async def _process_entry_background(entry_id: int, text: str) -> None:
                 )
                 session.add(inbox_item)
                 await session.commit()
+                await session.refresh(inbox_item)
                 print(f"[Queue] Entry {entry_id}: Created inbox item '{formatted.title}'")
+
+                await broadcast_inbox_item({
+                    "id": inbox_item.id,
+                    "title": inbox_item.title,
+                    "message": inbox_item.message,
+                    "action": inbox_item.action,
+                    "status": inbox_item.status,
+                    "journal_entry_id": inbox_item.journal_entry_id,
+                    "journal_excerpt": inbox_item.journal_excerpt,
+                    "created_at": inbox_item.created_at.isoformat(),
+                    "is_read": inbox_item.is_read,
+                })
         except Exception as e:
             print(f"[Queue] Entry {entry_id}: Error - {e}")
 
@@ -377,6 +406,7 @@ async def list_inbox_items(
             journal_entry_id=item.journal_entry_id,
             journal_excerpt=item.journal_excerpt,
             created_at=item.created_at,
+            is_read=item.is_read,
         )
         for item in items
     ]
@@ -401,6 +431,7 @@ async def get_inbox_item(
         journal_entry_id=item.journal_entry_id,
         journal_excerpt=item.journal_excerpt,
         created_at=item.created_at,
+        is_read=item.is_read,
     )
 
 
@@ -436,6 +467,7 @@ async def update_inbox_item(
         journal_entry_id=item.journal_entry_id,
         journal_excerpt=item.journal_excerpt,
         created_at=item.created_at,
+        is_read=item.is_read,
     )
 
 
@@ -452,3 +484,67 @@ async def delete_inbox_item(
     await session.delete(item)
     await session.commit()
     return {"status": "deleted"}
+
+
+@app.patch("/inbox/{item_id}/read", response_model=InboxItemResponse)
+async def mark_inbox_item_read(
+    item_id: int,
+    session: AsyncSession = Depends(get_session),
+) -> InboxItemResponse:
+    stmt = select(InboxItem).where(InboxItem.id == item_id)
+    item = (await session.execute(stmt)).scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="Inbox item not found")
+
+    item.is_read = True
+    await session.commit()
+    await session.refresh(item)
+
+    return InboxItemResponse(
+        id=item.id,
+        title=item.title,
+        message=item.message,
+        action=item.action,
+        status=item.status,
+        journal_entry_id=item.journal_entry_id,
+        journal_excerpt=item.journal_excerpt,
+        created_at=item.created_at,
+        is_read=item.is_read,
+    )
+
+
+async def _sse_generator(queue: asyncio.Queue):
+    """Generate SSE events from a queue."""
+    try:
+        while True:
+            try:
+                message = await asyncio.wait_for(queue.get(), timeout=30.0)
+                yield f"event: inbox-item\ndata: {message}\n\n"
+            except asyncio.TimeoutError:
+                yield ": heartbeat\n\n"
+    except asyncio.CancelledError:
+        pass
+
+
+@app.get("/events")
+async def sse_events():
+    queue: asyncio.Queue = asyncio.Queue(maxsize=100)
+    sse_clients.append(queue)
+
+    async def cleanup_generator():
+        try:
+            async for event in _sse_generator(queue):
+                yield event
+        finally:
+            if queue in sse_clients:
+                sse_clients.remove(queue)
+
+    return StreamingResponse(
+        cleanup_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

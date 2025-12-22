@@ -78,6 +78,13 @@ export const inboxApi = {
     return handleResponse(response);
   },
 
+  async markAsRead(id: number): Promise<InboxItemResponse> {
+    const response = await fetch(`${API_BASE}/inbox/${id}/read`, {
+      method: "PATCH",
+    });
+    return handleResponse(response);
+  },
+
   async delete(id: number): Promise<void> {
     const response = await fetch(`${API_BASE}/inbox/${id}`, { method: "DELETE" });
     if (!response.ok) {

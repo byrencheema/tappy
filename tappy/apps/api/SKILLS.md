@@ -92,6 +92,7 @@ Profile setup:
 | Google Calendar | `20f63d34-afa9-4e18-b361-47edd270c3ca` | action |
 | YouTube Search | `e6cec7da-4d28-4fc2-91e5-0f7cf4602196` | data_retrieval |
 | Amazon Add to Cart | `adbd36f2-a522-4f06-b458-946bd236ded2` | action |
+| Save Gmail Draft | `27441e62-faaf-4c15-855a-f7bbb479bbf0` | action |
 
 ## Adding New Skills
 

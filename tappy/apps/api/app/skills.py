@@ -336,8 +336,8 @@ class BrowserUseSkillHandler(SkillHandler):
                 task_data = task_resp.json()
                 task_id = task_data.get("id")
 
-                # Poll for completion (max 2 minutes)
-                for _ in range(40):
+                # Poll for completion (max 5 minutes - Gmail can take 4+ min)
+                for _ in range(100):
                     await asyncio.sleep(3)
                     status_resp = await client.get(
                         f"{base_url}/tasks/{task_id}",
@@ -438,6 +438,13 @@ class BrowserUseSkillHandler(SkillHandler):
             product_query = parameters.get("product_query", "")
             quantity = parameters.get("quantity", 1)
             return f'Search for "{product_query}" on Amazon and add {quantity} to the cart'
+
+        # Save Gmail Draft
+        if self.config.name == "Save Gmail Draft":
+            to = parameters.get("to", "")
+            subject = parameters.get("subject", "")
+            body = parameters.get("body", "")
+            return f'Go to Gmail, click compose, fill in To: {to}, Subject: {subject}, Body: {body}, then close to save as draft. Do NOT send.'
 
         return f"Execute {self.config.name} with parameters: {parameters}"
 

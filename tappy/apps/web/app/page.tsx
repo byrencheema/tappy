@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Search, Loader2, Zap } from "lucide-react";
+import { Plus, Search, Loader2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { journalApi } from "@/lib/api";
@@ -182,12 +182,6 @@ export default function JournalPage() {
                       </p>
                       {isOptimistic && (
                         <span className="text-[10px] text-muted-foreground/60">saving...</span>
-                      )}
-                      {!isOptimistic && entry.actions_triggered > 0 && (
-                        <span className="inline-flex items-center gap-0.5 text-[10px] text-primary">
-                          <Zap className="h-2.5 w-2.5" />
-                          {entry.actions_triggered}
-                        </span>
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">
