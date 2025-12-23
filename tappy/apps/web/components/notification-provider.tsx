@@ -21,8 +21,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           <Image
             src="/tappy-lightbulb.png"
             alt="Tappy"
-            width={40}
-            height={40}
+            width={48}
+            height={48}
             className="rounded"
           />
         ),
@@ -54,6 +54,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           actionButtonStyle: {
             background: "hsl(25 12% 18%)",
             color: "hsl(40 20% 94%)",
+          },
+          classNames: {
+            icon: "!w-12 !h-12 !mr-2",
           },
         }}
       />
