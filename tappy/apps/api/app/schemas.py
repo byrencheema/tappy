@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 
 # Journal Entry Schemas
@@ -25,8 +25,13 @@ class JournalEntryResponse(BaseModel):
     created_at: datetime
     actions_triggered: int = Field(default=0, description="Number of inbox items created from this entry")
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
+
+    @field_serializer("created_at")
+    def serialize_datetime(self, dt: datetime) -> str:
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat().replace("+00:00", "Z")
 
 
 class JournalEntryListItem(BaseModel):
@@ -37,8 +42,13 @@ class JournalEntryListItem(BaseModel):
     created_at: datetime
     actions_triggered: int = 0
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
+
+    @field_serializer("created_at")
+    def serialize_datetime(self, dt: datetime) -> str:
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat().replace("+00:00", "Z")
 
 
 # Inbox Item Schemas
@@ -67,8 +77,13 @@ class InboxItemResponse(BaseModel):
     is_read: bool = False
     skill_result: Optional[Dict[str, Any]] = Field(None, description="Result from skill execution")
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
+
+    @field_serializer("created_at")
+    def serialize_datetime(self, dt: datetime) -> str:
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat().replace("+00:00", "Z")
 
 
 # Planner Schemas - Generic for any skill

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import ForeignKey, String, Text, DateTime
@@ -20,7 +20,7 @@ class JournalEntry(Base):
     title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)  # Plain text for searching
     content_json: Mapped[str] = mapped_column(Text, nullable=False)  # Full Editor.js JSON
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     # Relationship to inbox items
     inbox_items: Mapped[list["InboxItem"]] = relationship(
@@ -40,7 +40,7 @@ class InboxItem(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
     journal_excerpt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     is_read: Mapped[bool] = mapped_column(default=False)
 
     # Relationship to journal entry

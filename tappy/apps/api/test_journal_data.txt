@@ -1,0 +1,58 @@
+# Test Journal Entries
+
+## Single Skill Triggers
+
+### Tech Job Search
+I'm really frustrated with my current job. The work environment is toxic and I'm not learning anything new. I think it's time to look for new software engineering positions, maybe in full-stack development or machine learning.
+
+### HackerNews
+I want to catch up on what's trending in tech today. I always find interesting discussions on HackerNews and I'd love to see what the top posts are right now.
+
+### Weather
+I'm planning a hiking trip to Yosemite this weekend and I'm wondering what the weather will be like. Should I pack a rain jacket? I need to check the forecast for the next few days.
+
+### X.com Post
+Just had a hot take: the future of AI isn't about replacing developers, it's about making us 10x more productive. I should post this on Twitter.
+
+### Google Calendar
+I need to schedule a dentist appointment for next Tuesday at 2pm. It's at the downtown office on Main Street. Should block out about 90 minutes for the whole thing.
+
+### YouTube Search
+I want to learn how to build a RAG application with LangChain. I should find some good YouTube tutorials on this topic.
+
+### Amazon Add to Cart
+My mechanical keyboard is getting worn out. I've been eyeing the Keychron K2 wireless mechanical keyboard. I should add it to my Amazon cart.
+
+### Gmail Draft
+I need to send an email to my manager about the project timeline. Send to sarah@company.com with subject 'Q1 Project Timeline Update'. Body: Hi Sarah, I wanted to give you an update on the Q1 project timeline. We're making good progress but we may need an extra week to complete the testing phase.
+
+## Non-Triggering Entries
+
+### Neutral 1
+Today was a quiet day. I spent most of the morning reading a book about philosophy and thinking about the nature of consciousness. I made some coffee around noon and sat on my porch watching the birds.
+
+### Neutral 2
+I'm feeling grateful today for the small things. My morning cup of tea was perfect, the sun was shining through my window, and I had a nice conversation with an old friend.
+
+### Neutral 3
+Random thoughts from today: Why do we park in driveways and drive on parkways? I noticed my neighbor got a new plant. The grocery store was surprisingly empty this afternoon.
+
+### Neutral 4
+I've been getting back into painting lately. Today I worked on a landscape piece - nothing too ambitious, just trying to capture the colors of sunset.
+
+## Multi-Skill Triggers
+
+### Job Search + Weather
+I'm so done with my current job. The company culture is terrible and I need to look for new opportunities in machine learning roles. Also, I'm planning to go camping in Colorado next weekend and I really need to check what the weather will be like in Denver.
+
+### Calendar + Email
+I need to schedule a team meeting for next Thursday at 3pm to discuss the product roadmap. Also, I should draft an email to team@company.com about this meeting.
+
+### YouTube + Amazon
+I want to learn how to build a home server and set up my own NAS system. I should find tutorial videos on YouTube. Also, I need to add a WD Red 4TB hard drive to my Amazon cart - make that 3 drives for the RAID setup.
+
+### Triple: HackerNews + X Post + Weather
+I want to catch up on what's trending on HackerNews today. Also, I just realized: AI actually amplifies human creativity - this is a hot take I should tweet. Oh, and I'm going to the beach Saturday, need to check the weather for Santa Monica.
+
+### All Data Retrieval: Job + HackerNews + Weather + YouTube
+I'm unhappy with my current job - need to look for DevOps opportunities. Also want to see what's trending on HackerNews. For my Seattle trip next week, I should check the weather. Finally, I want to learn Rust - should find YouTube tutorials.
