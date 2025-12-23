@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BookOpen, Inbox } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useInbox } from "@/lib/inbox-context";
 
 type NavigationItem = {
   name: string;
@@ -13,21 +14,23 @@ type NavigationItem = {
   badge?: number;
 };
 
-const navigation: NavigationItem[] = [
-  {
-    name: "Journal",
-    href: "/",
-    icon: BookOpen,
-  },
-  {
-    name: "Inbox",
-    href: "/inbox",
-    icon: Inbox,
-  },
-];
-
 export function Sidebar() {
   const pathname = usePathname();
+  const { unreadCount } = useInbox();
+
+  const navigation: NavigationItem[] = [
+    {
+      name: "Journal",
+      href: "/",
+      icon: BookOpen,
+    },
+    {
+      name: "Inbox",
+      href: "/inbox",
+      icon: Inbox,
+      badge: unreadCount > 0 ? unreadCount : undefined,
+    },
+  ];
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-60 border-r border-sidebar-border bg-sidebar">

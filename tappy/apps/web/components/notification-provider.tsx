@@ -4,23 +4,26 @@ import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Toaster, toast } from "sonner";
 import { useSSE } from "@/lib/useSSE";
+import { useInbox } from "@/lib/inbox-context";
 import type { InboxItemResponse } from "@/types/api";
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const { addItem } = useInbox();
 
   const handleInboxItem = useCallback(
     (item: InboxItemResponse) => {
+      addItem(item);
       toast("Tappy found something for you", {
         description: item.title,
         action: {
           label: "View",
           onClick: () => router.push("/inbox"),
         },
-        duration: 5000,
+        duration: 7500,
       });
     },
-    [router]
+    [router, addItem]
   );
 
   useSSE(handleInboxItem);
