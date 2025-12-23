@@ -114,8 +114,6 @@ class FormattedSkillResult(BaseModel):
     """Formatted result ready for inbox item creation."""
     title: str = Field(..., description="Inbox item title")
     message: str = Field(..., description="Human-readable message")
-    action: Optional[str] = Field(None, description="Call-to-action button text")
-    status: str = Field(default="needs_confirmation", description="Initial inbox item status")
 
 
 # Skill Configuration

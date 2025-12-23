@@ -1,37 +1,39 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Check, Clock, AlertCircle, Loader2, ArrowUpRight, Filter } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Loader2, ArrowUpRight, Search, X, Inbox } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { inboxApi } from "@/lib/api";
-import type { InboxItemResponse, InboxItemStatus } from "@/types/api";
+import type { InboxItemResponse } from "@/types/api";
 
-function getStatusInfo(status: InboxItemStatus) {
-  switch (status) {
-    case "needs_confirmation":
-      return { icon: AlertCircle, color: "text-amber-500", bg: "bg-amber-500/10" };
-    case "completed":
-      return { icon: Check, color: "text-green-500", bg: "bg-green-500/10" };
-    case "pending":
-      return { icon: Clock, color: "text-blue-500", bg: "bg-blue-500/10" };
-  }
-}
+type DateSegment = {
+  label: string;
+  items: InboxItemResponse[];
+};
 
-function formatTimestamp(dateString: string) {
+function getDateSegment(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const hours = Math.floor(diff / 1000 / 60 / 60);
-  const days = Math.floor(hours / 24);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const entryDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.floor((today.getTime() - entryDate.getTime()) / 86400000);
+  const dayOfWeek = today.getDay();
 
-  if (hours < 1) return "Just now";
-  if (hours < 24) return `${hours}h ago`;
-  if (days === 1) return "Yesterday";
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays <= dayOfWeek && diffDays < 7) return "Earlier this week";
+  if (diffDays < 14) return "Last week";
+  if (diffDays < 30) return "This month";
+  return "Older";
 }
 
-function formatFullDate(dateString: string) {
+function formatTime(dateString: string): string {
+  const date = new Date(dateString);
+  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+function formatFullDate(dateString: string): string {
   const date = new Date(dateString);
   return date.toLocaleDateString("en-US", {
     weekday: "long",
@@ -44,13 +46,20 @@ function sanitizeText(text: string): string {
   return text.replace(/&nbsp;?/g, " ");
 }
 
+function getTimeBasedGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return "Good morning";
+  if (hour >= 12 && hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 export default function InboxPage() {
   const [items, setItems] = useState<InboxItemResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [statusFilter, setStatusFilter] = useState<InboxItemStatus | "all">("all");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     async function loadItems() {
@@ -68,15 +77,39 @@ export default function InboxPage() {
     loadItems();
   }, []);
 
-  const filteredItems = items.filter((item) =>
-    statusFilter === "all" ? true : item.status === statusFilter
-  );
+  const filteredItems = useMemo(() => {
+    if (!searchQuery) return items;
 
-  const sortedItems = [...filteredItems].sort((a, b) => {
-    const aDate = new Date(a.created_at).getTime();
-    const bDate = new Date(b.created_at).getTime();
-    return sortOrder === "newest" ? bDate - aDate : aDate - bDate;
-  });
+    const query = searchQuery.toLowerCase();
+    return items.filter(
+      (item) =>
+        item.title.toLowerCase().includes(query) ||
+        item.message.toLowerCase().includes(query)
+    );
+  }, [items, searchQuery]);
+
+  const sortedItems = useMemo(() => {
+    return [...filteredItems].sort((a, b) => {
+      const aDate = new Date(a.created_at).getTime();
+      const bDate = new Date(b.created_at).getTime();
+      return sortOrder === "newest" ? bDate - aDate : aDate - bDate;
+    });
+  }, [filteredItems, sortOrder]);
+
+  const segmentedItems = useMemo(() => {
+    const segments: Record<string, InboxItemResponse[]> = {};
+    const order = ["Today", "Yesterday", "Earlier this week", "Last week", "This month", "Older"];
+
+    sortedItems.forEach((item) => {
+      const segment = getDateSegment(item.created_at);
+      if (!segments[segment]) segments[segment] = [];
+      segments[segment].push(item);
+    });
+
+    return order
+      .filter((label) => segments[label]?.length > 0)
+      .map((label) => ({ label, items: segments[label] }));
+  }, [sortedItems]);
 
   useEffect(() => {
     if (isLoading || error) return;
@@ -89,15 +122,6 @@ export default function InboxPage() {
       setSelectedId(sortedItems[0].id);
     }
   }, [sortedItems, selectedId, isLoading, error]);
-
-  const handleConfirm = async (id: number) => {
-    try {
-      const updated = await inboxApi.update(id, { status: "completed" });
-      setItems((prev) => prev.map((item) => (item.id === id ? updated : item)));
-    } catch (err) {
-      console.error("Failed to update item:", err);
-    }
-  };
 
   const handleSelectItem = async (id: number) => {
     setSelectedId(id);
@@ -116,6 +140,7 @@ export default function InboxPage() {
     try {
       await inboxApi.delete(id);
       setItems((prev) => prev.filter((item) => item.id !== id));
+      setSelectedId(null);
     } catch (err) {
       console.error("Failed to delete item:", err);
     }
@@ -125,240 +150,209 @@ export default function InboxPage() {
   const unreadCount = items.filter((i) => !i.is_read).length;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border">
-        <div className="flex h-14 items-center gap-3 px-6">
-          <h1 className="text-xl font-semibold text-foreground">Inbox</h1>
-          {unreadCount > 0 && (
-            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1.5 text-xs font-medium text-white">
-              {unreadCount}
-            </span>
-          )}
-        </div>
-      </header>
+    <div className="min-h-screen bg-background flex">
+      <aside className="w-80 flex-shrink-0 border-r border-border/40 flex flex-col h-screen sticky top-0">
+        <div className="p-4 border-b border-border/40">
+          <div className="mb-4">
+            <p className="text-[10px] font-semibold text-primary uppercase tracking-widest mb-0.5">
+              {getTimeBasedGreeting()}
+            </p>
+            <div className="flex items-center gap-2">
+              <h1 className="font-serif text-[24px] font-semibold text-foreground tracking-tight">
+                Inbox
+              </h1>
+              {unreadCount > 0 && (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
+                  {unreadCount}
+                </span>
+              )}
+            </div>
+          </div>
 
-      {/* Loading */}
-      {isLoading && (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/40" />
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-9 w-full rounded-lg border border-border/40 bg-card/50 pl-9 pr-3 text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/40 focus:bg-card focus:ring-2 focus:ring-primary/10 transition-all"
+            />
+          </div>
         </div>
-      )}
 
-      {/* Error */}
-      {error && !isLoading && (
-        <div className="text-center py-16">
-          <p className="text-destructive">{error}</p>
-          <button onClick={() => window.location.reload()} className="mt-4 text-sm text-primary hover:underline">
-            Try again
+        <div className="px-4 py-2 border-b border-border/40 flex items-center justify-end">
+          <button
+            onClick={() => setSortOrder((prev) => (prev === "newest" ? "oldest" : "newest"))}
+            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap"
+          >
+            {sortOrder === "newest" ? "Newest" : "Oldest"}
           </button>
         </div>
-      )}
 
-      {/* Empty State */}
-      {!isLoading && !error && items.length === 0 && (
-        <div className="mx-auto max-w-2xl px-6 py-16">
-          <div className="text-center">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-secondary">
-              <Check className="h-6 w-6 text-muted-foreground" />
+        <div className="flex-1 overflow-y-auto">
+          {isLoading && (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
-            <h3 className="font-medium text-foreground mb-1">All caught up!</h3>
-            <p className="text-sm text-muted-foreground">I&apos;ll let you know when I find something.</p>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Content */}
-      {!isLoading && !error && items.length > 0 && (
-        <div className="flex h-[calc(100vh-3.5rem)] flex-col">
-          <div className="flex items-center justify-between border-b border-border/60 bg-background px-4 py-2.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                <Filter className="h-3 w-3" />
-              </span>
-              {(["all", "needs_confirmation", "pending", "completed"] as const).map((filterKey) => {
-                const isActive = statusFilter === filterKey;
-                const label =
-                  filterKey === "all"
-                    ? "All"
-                    : filterKey === "needs_confirmation"
-                    ? "Needs review"
-                    : filterKey === "pending"
-                    ? "In progress"
-                    : "Done";
-
-                return (
-                  <button
-                    key={filterKey}
-                    onClick={() => setStatusFilter(filterKey)}
-                    className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition ${
-                      isActive
-                        ? "border-primary/60 bg-primary/10 text-primary"
-                        : "border-border/80 bg-background text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
+          {error && !isLoading && (
+            <div className="text-center py-16 px-4">
+              <p className="text-sm text-destructive">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-3 text-sm text-primary hover:underline"
+              >
+                Try again
+              </button>
             </div>
-            <button
-              onClick={() => setSortOrder((prev) => (prev === "newest" ? "oldest" : "newest"))}
-              className="text-xs text-muted-foreground hover:text-foreground transition"
-            >
-              Sort: {sortOrder === "newest" ? "Newest → Oldest" : "Oldest → Newest"}
-            </button>
-          </div>
+          )}
 
-          <div className="flex flex-1">
-          {/* Sidebar */}
-          <aside className="w-80 flex-shrink-0 border-r border-border/60 overflow-y-auto bg-background">
+          {!isLoading && !error && items.length === 0 && (
+            <div className="text-center py-16 px-4">
+              <div className="w-10 h-10 rounded-full bg-secondary/50 flex items-center justify-center mx-auto mb-3">
+                <Inbox className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-medium text-foreground mb-1">All caught up!</p>
+              <p className="text-xs text-muted-foreground">
+                I&apos;ll let you know when I find something
+              </p>
+            </div>
+          )}
+
+          {!isLoading && !error && filteredItems.length === 0 && items.length > 0 && (
+            <div className="text-center py-16 px-4">
+              <p className="text-sm text-muted-foreground mb-2">No items found</p>
+              <button
+                onClick={() => setSearchQuery("")}
+                className="text-xs text-primary hover:underline"
+              >
+                Clear search
+              </button>
+            </div>
+          )}
+
+          {!isLoading && !error && segmentedItems.length > 0 && (
             <div className="p-2">
-              {sortedItems.map((item) => {
-                const isSelected = selectedId === item.id;
-                const status = getStatusInfo(item.status);
+              {segmentedItems.map((segment, segmentIndex) => (
+                <div key={segment.label} className={segmentIndex > 0 ? "mt-4" : ""}>
+                  <h2 className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest mb-1.5 px-2">
+                    {segment.label}
+                  </h2>
+                  <div className="space-y-0.5">
+                    {segment.items.map((item) => {
+                      const isSelected = selectedId === item.id;
 
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => handleSelectItem(item.id)}
-                    className={`group w-full text-left rounded-lg px-3 py-2.5 mb-0.5 transition-all ${
-                      isSelected
-                        ? "bg-secondary/80"
-                        : "hover:bg-secondary/50"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-0.5">
-                      <div className="flex items-center gap-2 min-w-0">
-                        {!item.is_read && (
-                          <div className="h-2 w-2 rounded-full bg-orange-500 flex-shrink-0" />
-                        )}
-                        <span className={`text-sm text-foreground truncate ${isSelected ? "font-medium" : ""}`}>
-                          {item.title}
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-muted-foreground flex-shrink-0">
-                        {formatTimestamp(item.created_at)}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground line-clamp-1">
-                      {sanitizeText(item.message.split("\n")[0].replace(/^[•\-\*]\s*/, ""))}
-                    </p>
-                    <div className="mt-1.5 flex items-center gap-2">
-                      <div className={`h-1.5 w-1.5 rounded-full ${status.color.replace("text-", "bg-")}`} />
-                      <span className={`text-[11px] ${status.color}`}>
-                        {item.status === "needs_confirmation"
-                          ? "Needs review"
-                          : item.status === "pending"
-                          ? "In progress"
-                          : "Done"}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => handleSelectItem(item.id)}
+                          className={`w-full text-left rounded-lg px-3 py-2.5 transition-all ${
+                            isSelected
+                              ? "bg-secondary"
+                              : "hover:bg-secondary/50"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-0.5">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {!item.is_read && (
+                                <div className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
+                              )}
+                              <span className={`text-sm text-foreground truncate ${isSelected ? "font-medium" : ""}`}>
+                                {item.title}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground/50 flex-shrink-0">
+                              {formatTime(item.created_at)}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground/70 line-clamp-1">
+                            {item.message.split("\n")[0].replace(/^[•\-\*]\s*/, "")}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
-          </aside>
-
-          {/* Main Content */}
-          <main className="flex-1 overflow-y-auto">
-            {selectedItem ? (
-              <div className="px-6 py-6">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-4 mb-6">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">{formatFullDate(selectedItem.created_at)}</p>
-                    <h1 className="text-lg font-semibold text-foreground">{selectedItem.title}</h1>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {selectedItem.status === "needs_confirmation" && selectedItem.action && (
-                      <>
-                        <button
-                          onClick={() => handleConfirm(selectedItem.id)}
-                          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                          {selectedItem.action}
-                        </button>
-                        <button
-                          onClick={() => handleDismiss(selectedItem.id)}
-                          className="h-8 rounded-lg px-3 text-sm text-muted-foreground hover:bg-secondary transition-colors"
-                        >
-                          Dismiss
-                        </button>
-                      </>
-                    )}
-                    {selectedItem.status === "pending" && (
-                      <div className="flex items-center gap-1.5 text-sm text-blue-500">
-                        <Clock className="h-4 w-4" />
-                        <span>In progress</span>
-                      </div>
-                    )}
-                    {selectedItem.status === "completed" && (
-                      <div className="flex items-center gap-1.5 text-sm text-green-500">
-                        <Check className="h-4 w-4" />
-                        <span>Done</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* From Tappy */}
-                <div className="flex items-center gap-2.5 mb-4">
-                  <Image src="/tappy_mascot.png" alt="Tappy" width={32} height={32} className="rounded-full" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Tappy</p>
-                  </div>
-                </div>
-
-                {/* Message */}
-                <div className="rounded-lg bg-secondary/50 p-4 text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                  {sanitizeText(selectedItem.message)}
-                </div>
-
-                {/* Journal Reference */}
-                {selectedItem.journal_excerpt && (
-                  <div className="mt-6 rounded-lg border border-border/60 p-4">
-                    <p className="text-xs text-muted-foreground mb-1.5">Based on what you wrote:</p>
-                    <p className="text-sm italic text-foreground">&ldquo;{sanitizeText(selectedItem.journal_excerpt)}&rdquo;</p>
-                  </div>
-                )}
-
-                {selectedItem.journal_entry_id && (
-                  <Link
-                    href={`/entry/${selectedItem.journal_entry_id}`}
-                    className="mt-4 inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-                  >
-                    <ArrowUpRight className="h-3.5 w-3.5" />
-                    Open journal entry
-                  </Link>
-                )}
-
-                {/* Actions */}
-                {selectedItem.status === "completed" && (
-                  <div className="mt-6 flex items-center justify-between pt-4 border-t border-border/60">
-                    <div className="flex items-center gap-1.5 text-sm text-green-500">
-                      <Check className="h-4 w-4" />
-                      <span>Done</span>
-                    </div>
-                    <button
-                      onClick={() => handleDismiss(selectedItem.id)}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      Remove from inbox
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="h-full flex items-center justify-center">
-                <p className="text-sm text-muted-foreground">Select a message</p>
-              </div>
-            )}
-          </main>
-          </div>
+          )}
         </div>
-      )}
+      </aside>
+
+      <main className="flex-1 overflow-hidden">
+        {selectedItem ? (
+          <div
+            key={selectedItem.id}
+            className="h-full overflow-y-auto animate-in slide-in-from-right-4 duration-200"
+          >
+            <div className="max-w-2xl mx-auto px-8 py-8">
+              <div className="mb-6">
+                <p className="text-xs text-muted-foreground mb-1">
+                  {formatFullDate(selectedItem.created_at)}
+                </p>
+                <h1 className="text-xl font-semibold text-foreground tracking-tight">
+                  {selectedItem.title}
+                </h1>
+              </div>
+
+              <div className="flex items-center gap-2.5 mb-6">
+                <Image
+                  src="/tappy_mascot.png"
+                  alt="Tappy"
+                  width={36}
+                  height={36}
+                  className="rounded-full"
+                />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Tappy</p>
+                  <p className="text-xs text-muted-foreground">Your assistant</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-secondary/50 p-5 text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                {selectedItem.message}
+              </div>
+
+              {selectedItem.journal_excerpt && (
+                <div className="mt-6 rounded-xl border border-border/40 p-4">
+                  <p className="text-xs text-muted-foreground mb-1.5">
+                    Based on what you wrote:
+                  </p>
+                  <p className="text-sm italic text-foreground">
+                    &ldquo;{selectedItem.journal_excerpt}&rdquo;
+                  </p>
+                </div>
+              )}
+
+              {selectedItem.journal_entry_id && (
+                <Link
+                  href={`/entry/${selectedItem.journal_entry_id}`}
+                  className="mt-4 inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+                >
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                  Open journal entry
+                </Link>
+              )}
+
+              <div className="mt-8 pt-6 border-t border-border/40">
+                <button
+                  onClick={() => handleDismiss(selectedItem.id)}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="h-full flex items-center justify-center">
+            <p className="text-sm text-muted-foreground">Select a message</p>
+          </div>
+        )}
+      </main>
     </div>
   );
 }

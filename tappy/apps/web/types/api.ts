@@ -27,14 +27,10 @@ export type JournalEntryCreate = {
 };
 
 // Inbox Item Types
-export type InboxItemStatus = "pending" | "completed" | "needs_confirmation";
-
 export type InboxItemResponse = {
   id: number;
   title: string;
   message: string;
-  action: string | null;
-  status: InboxItemStatus;
   journal_entry_id: number | null;
   journal_excerpt: string | null;
   created_at: string;
@@ -43,8 +39,6 @@ export type InboxItemResponse = {
 };
 
 export type InboxItemUpdate = {
-  status?: InboxItemStatus;
   title?: string;
   message?: string;
-  action?: string;
 };
