@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Loader2, ArrowUpRight, Search, X, Inbox } from "lucide-react";
+import { Loader2, ArrowUpRight, Search, X, Inbox, RefreshCw } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { inboxApi } from "@/lib/api";
+import { useInbox } from "@/lib/inbox-context";
 import type { InboxItemResponse } from "@/types/api";
 
 type DateSegment = {
@@ -54,28 +55,17 @@ function getTimeBasedGreeting(): string {
 }
 
 export default function InboxPage() {
-  const [items, setItems] = useState<InboxItemResponse[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { items, unreadCount, isLoading, error, updateItem, removeItem, refresh } = useInbox();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const [searchQuery, setSearchQuery] = useState("");
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    async function loadItems() {
-      try {
-        setIsLoading(true);
-        const data = await inboxApi.list();
-        setItems(data);
-      } catch (err) {
-        console.error("Failed to load inbox items:", err);
-        setError("Failed to load inbox items");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadItems();
-  }, []);
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refresh();
+    setIsRefreshing(false);
+  };
 
   const filteredItems = useMemo(() => {
     if (!searchQuery) return items;
@@ -129,7 +119,7 @@ export default function InboxPage() {
     if (item && !item.is_read) {
       try {
         const updated = await inboxApi.markAsRead(id);
-        setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
+        updateItem(id, updated);
       } catch (err) {
         console.error("Failed to mark item as read:", err);
       }
@@ -139,7 +129,7 @@ export default function InboxPage() {
   const handleDismiss = async (id: number) => {
     try {
       await inboxApi.delete(id);
-      setItems((prev) => prev.filter((item) => item.id !== id));
+      removeItem(id);
       setSelectedId(null);
     } catch (err) {
       console.error("Failed to delete item:", err);
@@ -147,7 +137,6 @@ export default function InboxPage() {
   };
 
   const selectedItem = items.find((item) => item.id === selectedId);
-  const unreadCount = items.filter((i) => !i.is_read).length;
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -166,6 +155,14 @@ export default function InboxPage() {
                   {unreadCount}
                 </span>
               )}
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="ml-auto p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors disabled:opacity-50"
+                title="Refresh inbox"
+              >
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+              </button>
             </div>
           </div>
 
