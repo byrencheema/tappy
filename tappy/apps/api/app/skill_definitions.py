@@ -14,7 +14,6 @@ from app.skills import (
     JobSearchParameters,
     HackerNewsParameters,
     WeatherParameters,
-    NewsSearchParameters,
     XPostParameters,
     GoogleCalendarParameters,
     YouTubeSearchParameters,
@@ -145,7 +144,7 @@ from app.skills import EmailParameters
 
 def format_gmail_draft_result(result: SkillExecutionResult) -> FormattedSkillResult:
     """Format Gmail draft results."""
-    if result.status == SkillStatus.FAILED:
+    if result.status == SkillStatus.FAILED.value:
         return FormattedSkillResult(
             title="📧 Draft Failed",
             message=f"Could not save draft: {result.error}",
@@ -427,108 +426,6 @@ weather_config = SkillConfig(
 weather_handler = BrowserUseSkillHandler(
     config=weather_config,
     formatter=format_weather_result
-)
-
-
-# ============================================================================
-# NEWS SEARCH SKILL
-# ============================================================================
-
-def format_news_result(result: SkillExecutionResult) -> FormattedSkillResult:
-    """Format news search results for inbox display."""
-
-    if result.status == SkillStatus.FAILED.value:
-        return FormattedSkillResult(
-            title="📰 News Search Failed",
-            message=f"Unable to search news: {result.error}",
-            status="pending"
-        )
-
-    try:
-        output = result.output
-        if not output or "result" not in output:
-            return FormattedSkillResult(
-                title="📰 News - No Results",
-                message="The search completed but returned no data.",
-                status="pending"
-            )
-
-        # Parse nested structure: result.data contains the actual news data
-        result_data = output.get("result", {})
-
-        # Check for API errors (rate limiting, etc.)
-        if not result_data.get("success", True):
-            error = result_data.get("error", {})
-            error_msg = error.get("message", "Unknown error")
-            error_code = error.get("code", "ERROR")
-            return FormattedSkillResult(
-                title="📰 News Search Failed",
-                message=f"{error_code}: {error_msg}",
-                status="pending"
-            )
-
-        data = result_data.get("data", {})
-        articles = data.get("articles", [])
-
-        if not articles:
-            return FormattedSkillResult(
-                title="📰 No Articles Found",
-                message="No news articles found. Try a different search.",
-                status="pending"
-            )
-
-        # Format articles (limit to 6 for display)
-        top_articles = articles[:6]
-        article_lines = []
-
-        for idx, article in enumerate(top_articles, 1):
-            title = article.get("title", "Untitled Article")
-            source = article.get("source", "Unknown Source")
-            snippet = article.get("snippet", "")
-
-            article_lines.append(f"{idx}. {title}")
-            article_lines.append(f"   📌 {source}")
-            if snippet:
-                # Truncate snippet to 100 chars
-                short_snippet = snippet[:100] + "..." if len(snippet) > 100 else snippet
-                article_lines.append(f"   {short_snippet}")
-            article_lines.append("")
-
-        message = "\n".join(article_lines)
-
-        return FormattedSkillResult(
-            title=f"📰 Found {len(articles)} article{'s' if len(articles) != 1 else ''}",
-            message=message,
-            action="Read Articles",
-            status="needs_confirmation"
-        )
-
-    except Exception as e:
-        return FormattedSkillResult(
-            title="📰 News - Format Error",
-            message=f"Results received but couldn't be formatted: {str(e)}",
-            status="pending"
-        )
-
-
-news_config = SkillConfig(
-    id="7ed94633-2162-4b78-a958-ba924b58c6e0",
-    name="News Search",
-    skill_type=SkillType.DATA_RETRIEVAL,
-    description="Searches for news articles on any topic",
-    parameter_schema=NewsSearchParameters,
-    example_params={"query": "AI developments", "max_results": 5},
-    planner_hints=(
-        "Trigger when journal reflects curiosity about current events, wondering what's happening "
-        "with a topic/company/industry, feeling uninformed, or mentions something they heard about. "
-        "Look for cues like 'wonder what X is up to', 'heard something about', 'curious about', "
-        "'want to catch up on', 'what's happening with'. Extract the topic of interest."
-    )
-)
-
-news_handler = BrowserUseSkillHandler(
-    config=news_config,
-    formatter=format_news_result
 )
 
 
@@ -914,7 +811,6 @@ def register_all_skills():
         (job_search_config, job_search_handler),
         (hackernews_config, hackernews_handler),
         (weather_config, weather_handler),
-        (news_config, news_handler),
         (xpost_config, xpost_handler),
         (google_calendar_config, google_calendar_handler),
         (youtube_search_config, youtube_search_handler),

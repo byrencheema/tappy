@@ -44,6 +44,10 @@ function getTimeBasedGreeting(): string {
   return "Good evening";
 }
 
+function sanitizeText(text: string): string {
+  return text.replace(/&nbsp;?/g, " ");
+}
+
 export default function JournalPage() {
   const [entries, setEntries] = useState<JournalEntryListItem[]>([]);
   const [optimisticEntry, setOptimisticEntry] = useState<JournalEntryListItem | null>(null);
@@ -278,7 +282,7 @@ export default function JournalPage() {
                                 )}
                               </div>
                               <p className="text-[13px] text-muted-foreground/80 line-clamp-2 leading-relaxed">
-                                {entry.preview}
+                                {sanitizeText(entry.preview)}
                               </p>
                             </div>
                             <span className="text-[11px] text-muted-foreground/50 flex-shrink-0 pt-1 font-medium">

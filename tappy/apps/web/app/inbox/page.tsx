@@ -40,6 +40,10 @@ function formatFullDate(dateString: string) {
   });
 }
 
+function sanitizeText(text: string): string {
+  return text.replace(/&nbsp;?/g, " ");
+}
+
 export default function InboxPage() {
   const [items, setItems] = useState<InboxItemResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -238,7 +242,7 @@ export default function InboxPage() {
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground line-clamp-1">
-                      {item.message.split("\n")[0].replace(/^[•\-\*]\s*/, "")}
+                      {sanitizeText(item.message.split("\n")[0].replace(/^[•\-\*]\s*/, ""))}
                     </p>
                     <div className="mt-1.5 flex items-center gap-2">
                       <div className={`h-1.5 w-1.5 rounded-full ${status.color.replace("text-", "bg-")}`} />
@@ -309,14 +313,14 @@ export default function InboxPage() {
 
                 {/* Message */}
                 <div className="rounded-lg bg-secondary/50 p-4 text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                  {selectedItem.message}
+                  {sanitizeText(selectedItem.message)}
                 </div>
 
                 {/* Journal Reference */}
                 {selectedItem.journal_excerpt && (
                   <div className="mt-6 rounded-lg border border-border/60 p-4">
                     <p className="text-xs text-muted-foreground mb-1.5">Based on what you wrote:</p>
-                    <p className="text-sm italic text-foreground">&ldquo;{selectedItem.journal_excerpt}&rdquo;</p>
+                    <p className="text-sm italic text-foreground">&ldquo;{sanitizeText(selectedItem.journal_excerpt)}&rdquo;</p>
                   </div>
                 )}
 

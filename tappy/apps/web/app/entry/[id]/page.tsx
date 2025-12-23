@@ -36,6 +36,13 @@ function formatTime(dateString: string) {
   });
 }
 
+function sanitizeHtml(html: string): string {
+  return html
+    .replace(/&nbsp;?/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function renderBlock(block: EditorBlock, index: number) {
   switch (block.type) {
     case "header": {
@@ -70,7 +77,7 @@ function renderBlock(block: EditorBlock, index: number) {
         <p
           key={index}
           className="text-base leading-[1.8] mb-4 text-foreground/90"
-          dangerouslySetInnerHTML={{ __html: text }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(text) }}
         />
       );
     }
@@ -82,7 +89,7 @@ function renderBlock(block: EditorBlock, index: number) {
           <ol key={index} className="list-decimal list-outside ml-6 mb-4 space-y-2">
             {items.map((item, i) => (
               <li key={i} className="text-base leading-[1.8] text-foreground/90 pl-2">
-                <span dangerouslySetInnerHTML={{ __html: item }} />
+                <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(item) }} />
               </li>
             ))}
           </ol>
@@ -92,7 +99,7 @@ function renderBlock(block: EditorBlock, index: number) {
         <ul key={index} className="list-disc list-outside ml-6 mb-4 space-y-2">
           {items.map((item, i) => (
             <li key={i} className="text-base leading-[1.8] text-foreground/90 pl-2">
-              <span dangerouslySetInnerHTML={{ __html: item }} />
+              <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(item) }} />
             </li>
           ))}
         </ul>

@@ -87,7 +87,6 @@ Profile setup:
 | Tech Job Search | `805c9a12-9d9d-4d64-8234-9d8b378cf6cf` | data_retrieval |
 | HackerNews Top Posts | `962a620b-607b-4c08-a51f-0376f24c1938` | data_retrieval |
 | Weather Forecast | `911880ed-b5a9-408e-803e-db1279585bab` | data_retrieval |
-| News Search | `7ed94633-2162-4b78-a958-ba924b58c6e0` | data_retrieval |
 | X.com Post Maker | `eb6153e1-1e95-4e5b-88ac-5158c9207b9c` | action |
 | Google Calendar | `20f63d34-afa9-4e18-b361-47edd270c3ca` | action |
 | YouTube Search | `e6cec7da-4d28-4fc2-91e5-0f7cf4602196` | data_retrieval |

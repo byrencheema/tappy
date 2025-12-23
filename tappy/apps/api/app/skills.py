@@ -28,7 +28,7 @@ else:
 
 class SkillType(str, Enum):
     """Types of skills based on their behavior and output."""
-    DATA_RETRIEVAL = "data_retrieval"  # Returns structured data (e.g., job search, news)
+    DATA_RETRIEVAL = "data_retrieval"  # Returns structured data (e.g., job search, weather)
     ACTION = "action"  # Performs actions (e.g., send email, book appointment)
     ANALYSIS = "analysis"  # Returns text analysis (e.g., research, summarize)
     INTERACTIVE = "interactive"  # May have progress updates (e.g., browser automation)
@@ -77,12 +77,6 @@ class WeatherParameters(BaseSkillParameters):
     location: str = Field(..., description="City or location for weather forecast")
     days: int = Field(default=7, ge=1, le=7, description="Number of days to forecast")
     units: str = Field(default="e", description="Temperature units: 'e' for Fahrenheit, 'm' for Celsius")
-
-
-class NewsSearchParameters(BaseSkillParameters):
-    """Parameters for news search skill."""
-    query: str = Field(..., description="Search query for news articles")
-    max_results: int = Field(default=10, ge=1, le=20, description="Max articles to return")
 
 
 class XPostParameters(BaseSkillParameters):
