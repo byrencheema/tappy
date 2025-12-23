@@ -159,9 +159,6 @@ export default function NewEntryPage() {
               />
             </div>
 
-            {/* Subtle divider */}
-            <div className="h-px bg-gradient-to-r from-border via-border/50 to-transparent mb-8" />
-
             {/* Editor */}
             <div className="journal-editor-wrapper notion-style">
               <JournalEditor

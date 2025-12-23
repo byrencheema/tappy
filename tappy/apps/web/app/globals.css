@@ -175,13 +175,6 @@ h3.ce-header {
   padding: 0.25rem 0;
 }
 
-/* Placeholder styling */
-.ce-paragraph[data-placeholder]:empty::before,
-.ce-paragraph[data-placeholder-active]:empty::before {
-  color: hsl(var(--muted-foreground));
-  opacity: 0.4;
-  font-style: normal;
-}
 
 /* Toolbar - minimal and elegant */
 .ce-toolbar {
