@@ -306,7 +306,7 @@ export default function InboxPage() {
                   className="rounded-full"
                 />
                 <div>
-                  <p className="text-sm font-medium text-foreground">Tappy</p>
+                  <p className="text-sm font-serif font-medium text-foreground">Tappy</p>
                   <p className="text-xs text-muted-foreground">Your assistant</p>
                 </div>
               </div>

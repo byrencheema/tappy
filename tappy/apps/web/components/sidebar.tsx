@@ -33,11 +33,11 @@ export function Sidebar() {
     <aside className="fixed left-0 top-0 z-40 h-screen w-60 border-r border-sidebar-border bg-sidebar">
       <div className="flex h-full flex-col">
         {/* Logo */}
-        <div className="flex h-16 items-center gap-3 px-5">
-          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl">
-            <Image src="/tappy_mascot.png" alt="Tappy" width={40} height={40} className="object-cover" />
+        <div className="flex h-16 items-center gap-2.5 px-5">
+          <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-lg">
+            <Image src="/tappy_mascot.png" alt="Tappy" width={28} height={28} className="object-cover" />
           </div>
-          <h1 className="text-base font-semibold text-sidebar-foreground">Tappy</h1>
+          <h1 className="text-xl font-serif font-semibold text-sidebar-foreground">Tappy</h1>
         </div>
 
         {/* Navigation */}
