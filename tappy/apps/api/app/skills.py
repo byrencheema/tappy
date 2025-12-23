@@ -109,11 +109,20 @@ class AmazonAddToCartParameters(BaseSkillParameters):
 # Note: SkillExecutionResult is imported from schemas.py to avoid duplication
 
 
+# Link structure for clickable items
+class SkillLink(BaseModel):
+    """A clickable link in skill results."""
+    label: str = Field(..., description="Display text for the link")
+    url: str = Field(..., description="URL to navigate to")
+    type: str = Field(default="external", description="Link type: external, job, video, article, calendar")
+
+
 # Formatted Result for Inbox
 class FormattedSkillResult(BaseModel):
     """Formatted result ready for inbox item creation."""
     title: str = Field(..., description="Inbox item title")
     message: str = Field(..., description="Human-readable message")
+    links: List[SkillLink] = Field(default_factory=list, description="Clickable links from skill results")
 
 
 # Skill Configuration

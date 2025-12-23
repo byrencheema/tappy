@@ -26,6 +26,13 @@ export type JournalEntryCreate = {
   content_json: string;
 };
 
+// Skill Link Type
+export type SkillLink = {
+  label: string;
+  url: string;
+  type: "external" | "job" | "video" | "article" | "calendar";
+};
+
 // Inbox Item Types
 export type InboxItemResponse = {
   id: number;
@@ -35,7 +42,9 @@ export type InboxItemResponse = {
   journal_excerpt: string | null;
   created_at: string;
   is_read: boolean;
-  skill_result?: Record<string, unknown> | null;
+  skill_result?: {
+    links?: SkillLink[];
+  } | null;
 };
 
 export type InboxItemUpdate = {

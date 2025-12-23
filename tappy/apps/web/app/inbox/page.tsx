@@ -1,12 +1,27 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Loader2, ArrowUpRight, Search, X, Inbox, RefreshCw } from "lucide-react";
+import { Loader2, ArrowUpRight, Search, X, Inbox, RefreshCw, ExternalLink, Briefcase, Play, FileText, Calendar } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { inboxApi } from "@/lib/api";
 import { useInbox } from "@/lib/inbox-context";
-import type { InboxItemResponse } from "@/types/api";
+import type { InboxItemResponse, SkillLink } from "@/types/api";
+
+function getLinkIcon(type: SkillLink["type"]) {
+  switch (type) {
+    case "job":
+      return <Briefcase className="h-3.5 w-3.5" />;
+    case "video":
+      return <Play className="h-3.5 w-3.5" />;
+    case "article":
+      return <FileText className="h-3.5 w-3.5" />;
+    case "calendar":
+      return <Calendar className="h-3.5 w-3.5" />;
+    default:
+      return <ExternalLink className="h-3.5 w-3.5" />;
+  }
+}
 
 type DateSegment = {
   label: string;
@@ -311,6 +326,33 @@ export default function InboxPage() {
               <div className="rounded-xl bg-secondary/50 p-5 text-sm text-foreground leading-relaxed whitespace-pre-wrap">
                 {selectedItem.message}
               </div>
+
+              {selectedItem.skill_result?.links && selectedItem.skill_result.links.length > 0 && (
+                <div className="mt-4 rounded-xl border border-border/40 p-4">
+                  <p className="text-xs font-medium text-muted-foreground mb-3">
+                    Links
+                  </p>
+                  <div className="space-y-2">
+                    {selectedItem.skill_result.links.map((link, idx) => (
+                      <a
+                        key={idx}
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-secondary/30 hover:bg-secondary transition-colors group"
+                      >
+                        <span className="flex-shrink-0 text-muted-foreground group-hover:text-primary transition-colors">
+                          {getLinkIcon(link.type)}
+                        </span>
+                        <span className="text-sm text-foreground truncate flex-1">
+                          {link.label}
+                        </span>
+                        <ExternalLink className="h-3 w-3 text-muted-foreground/50 group-hover:text-primary transition-colors flex-shrink-0" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {selectedItem.journal_excerpt && (
                 <div className="mt-6 rounded-xl border border-border/40 p-4">

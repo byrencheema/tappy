@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Toaster, toast } from "sonner";
 import { useSSE } from "@/lib/useSSE";
@@ -16,6 +17,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       addItem(item);
       toast("Tappy found something for you", {
         description: item.title,
+        icon: (
+          <Image
+            src="/tappy-lightbulb.png"
+            alt="Tappy"
+            width={40}
+            height={40}
+            className="rounded"
+          />
+        ),
         action: {
           label: "View",
           onClick: () => router.push("/inbox"),
@@ -40,6 +50,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             color: "hsl(40 20% 94%)",
             border: "1px solid hsl(25 12% 18%)",
             borderRadius: "0.625rem",
+          },
+          actionButtonStyle: {
+            background: "hsl(25 12% 18%)",
+            color: "hsl(40 20% 94%)",
           },
         }}
       />

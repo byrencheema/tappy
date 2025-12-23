@@ -237,11 +237,15 @@ async def _process_entry_background(entry_id: int, text: str) -> None:
             handler = get_registry().get_handler(plan.skill_id)
             if handler:
                 formatted = handler.format_result(execution)
+                skill_result = {
+                    "links": [link.model_dump() for link in formatted.links]
+                } if formatted.links else None
                 inbox_item = InboxItem(
                     journal_entry_id=entry_id,
                     title=formatted.title[:255],
                     message=formatted.message,
                     journal_excerpt=text[:200] if len(text) > 200 else text,
+                    skill_result=skill_result,
                 )
                 session.add(inbox_item)
                 await session.commit()
@@ -254,8 +258,9 @@ async def _process_entry_background(entry_id: int, text: str) -> None:
                     "message": inbox_item.message,
                     "journal_entry_id": inbox_item.journal_entry_id,
                     "journal_excerpt": inbox_item.journal_excerpt,
-                    "created_at": inbox_item.created_at.isoformat(),
+                    "created_at": inbox_item.created_at.isoformat() + "Z",
                     "is_read": inbox_item.is_read,
+                    "skill_result": inbox_item.skill_result,
                 })
         except Exception as e:
             print(f"[Queue] Entry {entry_id}: Error - {e}")

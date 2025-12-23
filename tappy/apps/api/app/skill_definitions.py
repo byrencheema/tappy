@@ -11,6 +11,7 @@ from app.schemas import SkillExecutionResult
 from app.skills import (
     BrowserUseSkillHandler,
     FormattedSkillResult,
+    SkillLink,
     JobSearchParameters,
     HackerNewsParameters,
     WeatherParameters,
@@ -38,7 +39,6 @@ def format_job_search_result(result: SkillExecutionResult) -> FormattedSkillResu
             message=f"Unable to complete job search: {result.error}"
         )
 
-    # Extract jobs from Browser Use API response
     try:
         output = result.output
         if not output or "result" not in output:
@@ -49,7 +49,6 @@ def format_job_search_result(result: SkillExecutionResult) -> FormattedSkillResu
 
         result_data = output.get("result", {})
 
-        # Check for API errors (rate limiting, etc.)
         if not result_data.get("success", True):
             error = result_data.get("error", {})
             error_msg = error.get("message", "Unknown error")
@@ -69,30 +68,39 @@ def format_job_search_result(result: SkillExecutionResult) -> FormattedSkillResu
                 message="Try adjusting your search criteria or checking back later."
             )
 
-        # Format top jobs (limit to 5 for display)
         top_jobs = jobs[:5]
         job_lines = []
+        links = []
 
         for idx, job in enumerate(top_jobs, 1):
             title = job.get("title", "Unknown Position")
             company = job.get("company", "Unknown Company")
             location = job.get("location", "Location not specified")
             salary = job.get("salary", "Salary not listed")
+            url = job.get("url", "")
 
             job_lines.append(f"{idx}. {title} at {company}")
             job_lines.append(f"   📍 {location}")
-            job_lines.append(f"   💰 {salary}")
-            job_lines.append("")  # Blank line between jobs
+            if salary and salary != "Salary not listed":
+                job_lines.append(f"   💰 {salary}")
+            job_lines.append("")
+
+            if url:
+                links.append(SkillLink(
+                    label=f"{title} at {company}",
+                    url=url,
+                    type="job"
+                ))
 
         message = "\n".join(job_lines)
 
-        # Add footer if more jobs available
         if total_count > 5:
             message += f"\n... and {total_count - 5} more jobs"
 
         return FormattedSkillResult(
             title=f"💼 Found {total_count} job{'s' if total_count != 1 else ''}",
-            message=message
+            message=message,
+            links=links
         )
 
     except Exception as e:
@@ -230,10 +238,8 @@ def format_hackernews_result(result: SkillExecutionResult) -> FormattedSkillResu
                 message="The fetch completed but returned no data."
             )
 
-        # Parse response - handle different structures
         result_data = output.get("result", {})
 
-        # Check for API errors (rate limiting, etc.)
         if not result_data.get("success", True):
             error = result_data.get("error", {})
             error_msg = error.get("message", "Unknown error")
@@ -252,24 +258,40 @@ def format_hackernews_result(result: SkillExecutionResult) -> FormattedSkillResu
                 message="Unable to fetch HackerNews posts at this time."
             )
 
-        # Format top posts (limit to 8 for display)
         top_posts = posts[:8]
         post_lines = []
+        links = []
 
         for idx, post in enumerate(top_posts, 1):
             title = post.get("title", "Untitled")
             score = post.get("score", 0)
             comments = post.get("comments_count", 0)
+            url = post.get("url", "")
+            comments_url = post.get("comments_url", "")
 
             post_lines.append(f"{idx}. {title}")
             post_lines.append(f"   ⬆️  {score} points | 💬 {comments} comments")
             post_lines.append("")
 
+            if url:
+                links.append(SkillLink(
+                    label=title,
+                    url=url,
+                    type="article"
+                ))
+            if comments_url:
+                links.append(SkillLink(
+                    label=f"Discussion: {title[:40]}{'...' if len(title) > 40 else ''}",
+                    url=comments_url,
+                    type="article"
+                ))
+
         message = "\n".join(post_lines)
 
         return FormattedSkillResult(
             title=f"🔶 Top {len(top_posts)} HackerNews Posts",
-            message=message
+            message=message,
+            links=links
         )
 
     except Exception as e:
@@ -625,22 +647,36 @@ def format_youtube_result(result: SkillExecutionResult) -> FormattedSkillResult:
 
         top_videos = videos[:6]
         video_lines = []
+        links = []
 
         for idx, video in enumerate(top_videos, 1):
             title = video.get("title", "Untitled Video")
             channel = video.get("channel", "Unknown Channel")
             views = video.get("view_count", video.get("views", "Unknown views"))
+            duration = video.get("duration", "")
+            url = video.get("url", "")
 
             video_lines.append(f"{idx}. {title}")
             video_lines.append(f"   📺 {channel}")
-            video_lines.append(f"   👁️  {views}")
+            detail_line = f"   👁️  {views}"
+            if duration:
+                detail_line += f" | ⏱️ {duration}"
+            video_lines.append(detail_line)
             video_lines.append("")
+
+            if url:
+                links.append(SkillLink(
+                    label=f"{title[:50]}{'...' if len(title) > 50 else ''}",
+                    url=url,
+                    type="video"
+                ))
 
         message = "\n".join(video_lines)
 
         return FormattedSkillResult(
             title=f"▶️ Found {len(videos)} video{'s' if len(videos) != 1 else ''}",
-            message=message
+            message=message,
+            links=links
         )
 
     except Exception as e:
