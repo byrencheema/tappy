@@ -28,7 +28,18 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   return (
     <>
       {children}
-      <Toaster position="bottom-right" richColors />
+      <Toaster
+        position="bottom-right"
+        theme="dark"
+        toastOptions={{
+          style: {
+            background: "hsl(25 12% 11%)",
+            color: "hsl(40 20% 94%)",
+            border: "1px solid hsl(25 12% 18%)",
+            borderRadius: "0.625rem",
+          },
+        }}
+      />
     </>
   );
 }
