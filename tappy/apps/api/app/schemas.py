@@ -46,18 +46,14 @@ class InboxItemCreate(BaseModel):
     """Request schema for creating an inbox item."""
     title: str
     message: str
-    action: Optional[str] = None
-    status: str = "pending"
     journal_entry_id: Optional[int] = None
     journal_excerpt: Optional[str] = None
 
 
 class InboxItemUpdate(BaseModel):
     """Request schema for updating an inbox item."""
-    status: Optional[str] = None
     title: Optional[str] = None
     message: Optional[str] = None
-    action: Optional[str] = None
 
 
 class InboxItemResponse(BaseModel):
@@ -65,8 +61,6 @@ class InboxItemResponse(BaseModel):
     id: int
     title: str
     message: str
-    action: Optional[str] = None
-    status: str
     journal_entry_id: Optional[int] = None
     journal_excerpt: Optional[str] = None
     created_at: datetime

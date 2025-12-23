@@ -35,8 +35,7 @@ def format_job_search_result(result: SkillExecutionResult) -> FormattedSkillResu
     if result.status == SkillStatus.FAILED.value:
         return FormattedSkillResult(
             title="💼 Job Search Failed",
-            message=f"Unable to complete job search: {result.error}",
-            status="pending"
+            message=f"Unable to complete job search: {result.error}"
         )
 
     # Extract jobs from Browser Use API response
@@ -45,8 +44,7 @@ def format_job_search_result(result: SkillExecutionResult) -> FormattedSkillResu
         if not output or "result" not in output:
             return FormattedSkillResult(
                 title="💼 Job Search - No Results",
-                message="The search completed but returned no data.",
-                status="pending"
+                message="The search completed but returned no data."
             )
 
         result_data = output.get("result", {})
@@ -58,8 +56,7 @@ def format_job_search_result(result: SkillExecutionResult) -> FormattedSkillResu
             error_code = error.get("code", "ERROR")
             return FormattedSkillResult(
                 title="💼 Job Search Failed",
-                message=f"{error_code}: {error_msg}",
-                status="pending"
+                message=f"{error_code}: {error_msg}"
             )
 
         data = result_data.get("data", {})
@@ -69,8 +66,7 @@ def format_job_search_result(result: SkillExecutionResult) -> FormattedSkillResu
         if not jobs:
             return FormattedSkillResult(
                 title="💼 No Jobs Found",
-                message="Try adjusting your search criteria or checking back later.",
-                status="pending"
+                message="Try adjusting your search criteria or checking back later."
             )
 
         # Format top jobs (limit to 5 for display)
@@ -96,16 +92,13 @@ def format_job_search_result(result: SkillExecutionResult) -> FormattedSkillResu
 
         return FormattedSkillResult(
             title=f"💼 Found {total_count} job{'s' if total_count != 1 else ''}",
-            message=message,
-            action="Browse Results",
-            status="needs_confirmation"
+            message=message
         )
 
     except Exception as e:
         return FormattedSkillResult(
             title="💼 Job Search - Format Error",
-            message=f"Results received but couldn't be formatted: {str(e)}",
-            status="pending"
+            message=f"Results received but couldn't be formatted: {str(e)}"
         )
 
 
@@ -147,15 +140,12 @@ def format_gmail_draft_result(result: SkillExecutionResult) -> FormattedSkillRes
     if result.status == SkillStatus.FAILED.value:
         return FormattedSkillResult(
             title="📧 Draft Failed",
-            message=f"Could not save draft: {result.error}",
-            status="pending"
+            message=f"Could not save draft: {result.error}"
         )
 
     return FormattedSkillResult(
         title="📧 Draft Saved",
-        message="Your email draft was saved to Gmail.",
-        action="View Drafts",
-        status="completed"
+        message="Your email draft was saved to Gmail."
     )
 
 
@@ -229,8 +219,7 @@ def format_hackernews_result(result: SkillExecutionResult) -> FormattedSkillResu
     if result.status == SkillStatus.FAILED.value:
         return FormattedSkillResult(
             title="🔶 HackerNews Fetch Failed",
-            message=f"Unable to fetch posts: {result.error}",
-            status="pending"
+            message=f"Unable to fetch posts: {result.error}"
         )
 
     try:
@@ -238,8 +227,7 @@ def format_hackernews_result(result: SkillExecutionResult) -> FormattedSkillResu
         if not output or "result" not in output:
             return FormattedSkillResult(
                 title="🔶 HackerNews - No Results",
-                message="The fetch completed but returned no data.",
-                status="pending"
+                message="The fetch completed but returned no data."
             )
 
         # Parse response - handle different structures
@@ -252,8 +240,7 @@ def format_hackernews_result(result: SkillExecutionResult) -> FormattedSkillResu
             error_code = error.get("code", "ERROR")
             return FormattedSkillResult(
                 title="🔶 HackerNews Fetch Failed",
-                message=f"{error_code}: {error_msg}",
-                status="pending"
+                message=f"{error_code}: {error_msg}"
             )
 
         data = result_data.get("data", {})
@@ -262,8 +249,7 @@ def format_hackernews_result(result: SkillExecutionResult) -> FormattedSkillResu
         if not posts:
             return FormattedSkillResult(
                 title="🔶 No Posts Found",
-                message="Unable to fetch HackerNews posts at this time.",
-                status="pending"
+                message="Unable to fetch HackerNews posts at this time."
             )
 
         # Format top posts (limit to 8 for display)
@@ -283,16 +269,13 @@ def format_hackernews_result(result: SkillExecutionResult) -> FormattedSkillResu
 
         return FormattedSkillResult(
             title=f"🔶 Top {len(top_posts)} HackerNews Posts",
-            message=message,
-            action="Read on HN",
-            status="needs_confirmation"
+            message=message
         )
 
     except Exception as e:
         return FormattedSkillResult(
             title="🔶 HackerNews - Format Error",
-            message=f"Results received but couldn't be formatted: {str(e)}",
-            status="pending"
+            message=f"Results received but couldn't be formatted: {str(e)}"
         )
 
 
@@ -327,8 +310,7 @@ def format_weather_result(result: SkillExecutionResult) -> FormattedSkillResult:
     if result.status == SkillStatus.FAILED.value:
         return FormattedSkillResult(
             title="🌤️ Weather Forecast Failed",
-            message=f"Unable to fetch weather: {result.error}",
-            status="pending"
+            message=f"Unable to fetch weather: {result.error}"
         )
 
     try:
@@ -336,8 +318,7 @@ def format_weather_result(result: SkillExecutionResult) -> FormattedSkillResult:
         if not output or "result" not in output:
             return FormattedSkillResult(
                 title="🌤️ Weather - No Results",
-                message="The forecast fetch completed but returned no data.",
-                status="pending"
+                message="The forecast fetch completed but returned no data."
             )
 
         # Parse nested structure: result.data contains the actual weather data
@@ -350,8 +331,7 @@ def format_weather_result(result: SkillExecutionResult) -> FormattedSkillResult:
             error_code = error.get("code", "ERROR")
             return FormattedSkillResult(
                 title="🌤️ Weather Forecast Failed",
-                message=f"{error_code}: {error_msg}",
-                status="pending"
+                message=f"{error_code}: {error_msg}"
             )
 
         data = result_data.get("data", {})
@@ -362,8 +342,7 @@ def format_weather_result(result: SkillExecutionResult) -> FormattedSkillResult:
         if not forecasts:
             return FormattedSkillResult(
                 title="🌤️ No Forecast Available",
-                message=f"Unable to fetch weather for {location}.",
-                status="pending"
+                message=f"Unable to fetch weather for {location}."
             )
 
         # Format forecast
@@ -394,16 +373,13 @@ def format_weather_result(result: SkillExecutionResult) -> FormattedSkillResult:
 
         return FormattedSkillResult(
             title=f"🌤️ Weather for {location}",
-            message=message,
-            action="View Full Forecast",
-            status="needs_confirmation"
+            message=message
         )
 
     except Exception as e:
         return FormattedSkillResult(
             title="🌤️ Weather - Format Error",
-            message=f"Results received but couldn't be formatted: {str(e)}",
-            status="pending"
+            message=f"Results received but couldn't be formatted: {str(e)}"
         )
 
 
@@ -439,8 +415,7 @@ def format_xpost_result(result: SkillExecutionResult) -> FormattedSkillResult:
     if result.status == SkillStatus.FAILED.value:
         return FormattedSkillResult(
             title="𝕏 Post Failed",
-            message=f"Unable to post: {result.error}",
-            status="pending"
+            message=f"Unable to post: {result.error}"
         )
 
     try:
@@ -448,8 +423,7 @@ def format_xpost_result(result: SkillExecutionResult) -> FormattedSkillResult:
         if not output or "result" not in output:
             return FormattedSkillResult(
                 title="𝕏 Post - Unknown Status",
-                message="The post may have been sent but we couldn't confirm.",
-                status="pending"
+                message="The post may have been sent but we couldn't confirm."
             )
 
         result_data = output.get("result", {})
@@ -459,8 +433,7 @@ def format_xpost_result(result: SkillExecutionResult) -> FormattedSkillResult:
             error_msg = error.get("message", "Unknown error")
             return FormattedSkillResult(
                 title="𝕏 Post Failed",
-                message=error_msg,
-                status="pending"
+                message=error_msg
             )
 
         data = result_data.get("data", {})
@@ -473,16 +446,13 @@ def format_xpost_result(result: SkillExecutionResult) -> FormattedSkillResult:
 
         return FormattedSkillResult(
             title="𝕏 Posted Successfully",
-            message=message,
-            action="View Post",
-            status="completed"
+            message=message
         )
 
     except Exception as e:
         return FormattedSkillResult(
             title="𝕏 Post - Format Error",
-            message=f"Action completed but couldn't format result: {str(e)}",
-            status="pending"
+            message=f"Action completed but couldn't format result: {str(e)}"
         )
 
 
@@ -519,8 +489,7 @@ def format_google_calendar_result(result: SkillExecutionResult) -> FormattedSkil
     if result.status == SkillStatus.FAILED.value:
         return FormattedSkillResult(
             title="📅 Calendar Event Failed",
-            message=f"Unable to create event: {result.error}",
-            status="pending"
+            message=f"Unable to create event: {result.error}"
         )
 
     try:
@@ -528,8 +497,7 @@ def format_google_calendar_result(result: SkillExecutionResult) -> FormattedSkil
         if not output or "result" not in output:
             return FormattedSkillResult(
                 title="📅 Calendar Event - Unknown Status",
-                message="The event may have been created but we couldn't confirm.",
-                status="pending"
+                message="The event may have been created but we couldn't confirm."
             )
 
         result_data = output.get("result", {})
@@ -539,8 +507,7 @@ def format_google_calendar_result(result: SkillExecutionResult) -> FormattedSkil
             error_msg = error.get("message", "Unknown error")
             return FormattedSkillResult(
                 title="📅 Calendar Event Failed",
-                message=error_msg,
-                status="pending"
+                message=error_msg
             )
 
         data = result_data.get("data", {})
@@ -565,9 +532,7 @@ def format_google_calendar_result(result: SkillExecutionResult) -> FormattedSkil
 
             return FormattedSkillResult(
                 title="📅 Calendar Event Ready",
-                message=message,
-                action="Add to Calendar",
-                status="needs_confirmation"
+                message=message
             )
 
         message = f"Created: \"{event_title}\""
@@ -578,16 +543,13 @@ def format_google_calendar_result(result: SkillExecutionResult) -> FormattedSkil
 
         return FormattedSkillResult(
             title="📅 Event Created Successfully",
-            message=message,
-            action="View Calendar",
-            status="completed"
+            message=message
         )
 
     except Exception as e:
         return FormattedSkillResult(
             title="📅 Calendar - Format Error",
-            message=f"Action completed but couldn't format result: {str(e)}",
-            status="pending"
+            message=f"Action completed but couldn't format result: {str(e)}"
         )
 
 
@@ -630,8 +592,7 @@ def format_youtube_result(result: SkillExecutionResult) -> FormattedSkillResult:
     if result.status == SkillStatus.FAILED.value:
         return FormattedSkillResult(
             title="▶️ YouTube Search Failed",
-            message=f"Unable to search: {result.error}",
-            status="pending"
+            message=f"Unable to search: {result.error}"
         )
 
     try:
@@ -639,8 +600,7 @@ def format_youtube_result(result: SkillExecutionResult) -> FormattedSkillResult:
         if not output or "result" not in output:
             return FormattedSkillResult(
                 title="▶️ YouTube - No Results",
-                message="The search completed but returned no data.",
-                status="pending"
+                message="The search completed but returned no data."
             )
 
         result_data = output.get("result", {})
@@ -651,8 +611,7 @@ def format_youtube_result(result: SkillExecutionResult) -> FormattedSkillResult:
             error_code = error.get("code", "ERROR")
             return FormattedSkillResult(
                 title="▶️ YouTube Search Failed",
-                message=f"{error_code}: {error_msg}",
-                status="pending"
+                message=f"{error_code}: {error_msg}"
             )
 
         data = result_data.get("data", {})
@@ -661,8 +620,7 @@ def format_youtube_result(result: SkillExecutionResult) -> FormattedSkillResult:
         if not videos:
             return FormattedSkillResult(
                 title="▶️ No Videos Found",
-                message="No YouTube videos found. Try a different search.",
-                status="pending"
+                message="No YouTube videos found. Try a different search."
             )
 
         top_videos = videos[:6]
@@ -682,16 +640,13 @@ def format_youtube_result(result: SkillExecutionResult) -> FormattedSkillResult:
 
         return FormattedSkillResult(
             title=f"▶️ Found {len(videos)} video{'s' if len(videos) != 1 else ''}",
-            message=message,
-            action="Watch Videos",
-            status="needs_confirmation"
+            message=message
         )
 
     except Exception as e:
         return FormattedSkillResult(
             title="▶️ YouTube - Format Error",
-            message=f"Results received but couldn't be formatted: {str(e)}",
-            status="pending"
+            message=f"Results received but couldn't be formatted: {str(e)}"
         )
 
 
@@ -726,8 +681,7 @@ def format_amazon_cart_result(result: SkillExecutionResult) -> FormattedSkillRes
     if result.status == SkillStatus.FAILED.value:
         return FormattedSkillResult(
             title="🛒 Amazon Cart Failed",
-            message=f"Unable to add to cart: {result.error}",
-            status="pending"
+            message=f"Unable to add to cart: {result.error}"
         )
 
     try:
@@ -735,8 +689,7 @@ def format_amazon_cart_result(result: SkillExecutionResult) -> FormattedSkillRes
         if not output or "result" not in output:
             return FormattedSkillResult(
                 title="🛒 Amazon Cart - Unknown Status",
-                message="The item may have been added but we couldn't confirm.",
-                status="pending"
+                message="The item may have been added but we couldn't confirm."
             )
 
         result_data = output.get("result", {})
@@ -746,8 +699,7 @@ def format_amazon_cart_result(result: SkillExecutionResult) -> FormattedSkillRes
             error_msg = error.get("message", "Unknown error")
             return FormattedSkillResult(
                 title="🛒 Amazon Cart Failed",
-                message=error_msg,
-                status="pending"
+                message=error_msg
             )
 
         data = result_data.get("data", {})
@@ -766,16 +718,13 @@ def format_amazon_cart_result(result: SkillExecutionResult) -> FormattedSkillRes
 
         return FormattedSkillResult(
             title="🛒 Added to Amazon Cart",
-            message=message,
-            action="View Cart",
-            status="completed"
+            message=message
         )
 
     except Exception as e:
         return FormattedSkillResult(
             title="🛒 Amazon - Format Error",
-            message=f"Action completed but couldn't format result: {str(e)}",
-            status="pending"
+            message=f"Action completed but couldn't format result: {str(e)}"
         )
 
 

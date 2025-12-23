@@ -39,10 +39,6 @@ class InboxItem(Base):
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
-    action: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # CTA text
-    status: Mapped[str] = mapped_column(
-        String(50), nullable=False, default="pending"
-    )  # pending, completed, needs_confirmation
     journal_excerpt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     is_read: Mapped[bool] = mapped_column(default=False)

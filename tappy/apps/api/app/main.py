@@ -241,8 +241,6 @@ async def _process_entry_background(entry_id: int, text: str) -> None:
                     journal_entry_id=entry_id,
                     title=formatted.title[:255],
                     message=formatted.message,
-                    action=formatted.action,
-                    status=formatted.status,
                     journal_excerpt=text[:200] if len(text) > 200 else text,
                 )
                 session.add(inbox_item)
@@ -254,8 +252,6 @@ async def _process_entry_background(entry_id: int, text: str) -> None:
                     "id": inbox_item.id,
                     "title": inbox_item.title,
                     "message": inbox_item.message,
-                    "action": inbox_item.action,
-                    "status": inbox_item.status,
                     "journal_entry_id": inbox_item.journal_entry_id,
                     "journal_excerpt": inbox_item.journal_excerpt,
                     "created_at": inbox_item.created_at.isoformat(),
@@ -401,8 +397,6 @@ async def list_inbox_items(
             id=item.id,
             title=item.title,
             message=item.message,
-            action=item.action,
-            status=item.status,
             journal_entry_id=item.journal_entry_id,
             journal_excerpt=item.journal_excerpt,
             created_at=item.created_at,
@@ -426,8 +420,6 @@ async def get_inbox_item(
         id=item.id,
         title=item.title,
         message=item.message,
-        action=item.action,
-        status=item.status,
         journal_entry_id=item.journal_entry_id,
         journal_excerpt=item.journal_excerpt,
         created_at=item.created_at,
@@ -446,14 +438,10 @@ async def update_inbox_item(
     if not item:
         raise HTTPException(status_code=404, detail="Inbox item not found")
 
-    if payload.status is not None:
-        item.status = payload.status
     if payload.title is not None:
         item.title = payload.title
     if payload.message is not None:
         item.message = payload.message
-    if payload.action is not None:
-        item.action = payload.action
 
     await session.commit()
     await session.refresh(item)
@@ -462,8 +450,6 @@ async def update_inbox_item(
         id=item.id,
         title=item.title,
         message=item.message,
-        action=item.action,
-        status=item.status,
         journal_entry_id=item.journal_entry_id,
         journal_excerpt=item.journal_excerpt,
         created_at=item.created_at,
@@ -504,8 +490,6 @@ async def mark_inbox_item_read(
         id=item.id,
         title=item.title,
         message=item.message,
-        action=item.action,
-        status=item.status,
         journal_entry_id=item.journal_entry_id,
         journal_excerpt=item.journal_excerpt,
         created_at=item.created_at,
